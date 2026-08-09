@@ -11,6 +11,7 @@ import healthRoutes from './routes/health.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import clientsRoutes from './routes/clients.routes.js';
 import agentsRoutes from './routes/agents.routes.js';
+import reportsRoutes from './routes/reports.routes.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -31,6 +32,7 @@ export async function buildApp() {
   await app.register(settingsRoutes);
   await app.register(clientsRoutes);
   await app.register(agentsRoutes);
+  await app.register(reportsRoutes);
 
   return app;
 }

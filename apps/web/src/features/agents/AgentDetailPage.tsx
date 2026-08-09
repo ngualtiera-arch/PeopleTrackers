@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AUSTRALIAN_STATES, AGENT_SKILLS, DEFAULT_COUNTRY, type AgentSkillCode } from '@peopletrackers/shared';
 import { ActionBar } from '../../components/ActionBar';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { API_BASE } from '../../lib/api-client';
 import { useAgent, useCreateAgent, useUpdateAgent, useDeleteAgent } from './api';
 
 type FormState = Record<string, string>;
@@ -106,6 +107,7 @@ export function AgentDetailPage() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
         onDelete={isNew ? undefined : handleDelete}
+        onPrint={isNew ? undefined : () => window.open(`${API_BASE}/agents/${id}/report`, '_blank')}
         onPrev={prevId ? () => navigate(`/agents/${prevId}`, { state }) : undefined}
         onNext={nextId ? () => navigate(`/agents/${nextId}`, { state }) : undefined}
         prevNextLabel={currentIndex >= 0 ? `${currentIndex + 1} of ${orderedIds.length}` : undefined}
@@ -114,7 +116,17 @@ export function AgentDetailPage() {
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-6 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-900">{isNew ? 'New Agent' : agent?.name || 'Agent'}</h1>
-          {!isNew && <span className="text-sm text-slate-400">ID Agent: {agent?.reference}</span>}
+          <div className="flex items-center gap-3">
+            {!isNew && (
+              <button
+                className="text-sm text-accent-600 hover:underline"
+                onClick={() => window.open(`${API_BASE}/agents/${id}/report?type=envelope`, '_blank')}
+              >
+                Print Envelope
+              </button>
+            )}
+            {!isNew && <span className="text-sm text-slate-400">ID Agent: {agent?.reference}</span>}
+          </div>
         </div>
 
         <section className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4">

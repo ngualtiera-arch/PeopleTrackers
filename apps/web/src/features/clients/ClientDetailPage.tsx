@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { CLIENT_KINDS, AUSTRALIAN_STATES, PACKAGES, DEFAULT_COUNTRY } from '@peopletrackers/shared';
 import { ActionBar } from '../../components/ActionBar';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { API_BASE } from '../../lib/api-client';
 import { useClient, useCreateClient, useUpdateClient, useDeleteClient } from './api';
 
 type FormState = Record<string, string>;
@@ -108,6 +109,7 @@ export function ClientDetailPage() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
         onDelete={isNew ? undefined : handleDelete}
+        onPrint={isNew ? undefined : () => window.open(`${API_BASE}/clients/${id}/report`, '_blank')}
         onPrev={prevId ? () => navigate(`/clients/${prevId}`, { state }) : undefined}
         onNext={nextId ? () => navigate(`/clients/${nextId}`, { state }) : undefined}
         prevNextLabel={currentIndex >= 0 ? `${currentIndex + 1} of ${orderedIds.length}` : undefined}
@@ -118,7 +120,17 @@ export function ClientDetailPage() {
           <h1 className="text-lg font-semibold text-slate-900">
             {isNew ? 'New Client' : client?.company || client?.contactName || 'Client'}
           </h1>
-          {!isNew && <span className="text-sm text-slate-400">ID Client: {client?.reference}</span>}
+          <div className="flex items-center gap-3">
+            {!isNew && (
+              <button
+                className="text-sm text-accent-600 hover:underline"
+                onClick={() => window.open(`${API_BASE}/clients/${id}/report?type=envelope`, '_blank')}
+              >
+                Print Envelope
+              </button>
+            )}
+            {!isNew && <span className="text-sm text-slate-400">ID Client: {client?.reference}</span>}
+          </div>
         </div>
 
         <section className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4">

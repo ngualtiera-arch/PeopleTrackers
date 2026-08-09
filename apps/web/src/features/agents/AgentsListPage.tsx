@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionBar } from '../../components/ActionBar';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { API_BASE } from '../../lib/api-client';
 import { useAgentsList } from './api';
 import type { AgentWithSkills } from './types';
 
@@ -27,9 +28,21 @@ export function AgentsListPage() {
     navigate(`/agents/${id}`, { state: { orderedIds, listLabel: 'Agents' } });
   }
 
+  function printList() {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (needsReview) params.set('needsReview', 'true');
+    const qs = params.toString();
+    window.open(`${API_BASE}/agents/report/list${qs ? `?${qs}` : ''}`, '_blank');
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <ActionBar onFind={() => document.getElementById('agent-search')?.focus()} onNew={() => navigate('/agents/new')} />
+      <ActionBar
+        onFind={() => document.getElementById('agent-search')?.focus()}
+        onNew={() => navigate('/agents/new')}
+        onPrint={printList}
+      />
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <input

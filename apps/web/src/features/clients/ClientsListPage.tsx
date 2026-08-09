@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActionBar } from '../../components/ActionBar';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { API_BASE } from '../../lib/api-client';
 import { useClientsList } from './api';
 import type { ClientWithPackage } from './types';
 
@@ -28,9 +29,21 @@ export function ClientsListPage() {
     navigate(`/clients/${id}`, { state: { orderedIds, listLabel: 'Clients' } });
   }
 
+  function printList() {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (needsReview) params.set('needsReview', 'true');
+    const qs = params.toString();
+    window.open(`${API_BASE}/clients/report/list${qs ? `?${qs}` : ''}`, '_blank');
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <ActionBar onFind={() => document.getElementById('client-search')?.focus()} onNew={() => navigate('/clients/new')} />
+      <ActionBar
+        onFind={() => document.getElementById('client-search')?.focus()}
+        onNew={() => navigate('/clients/new')}
+        onPrint={printList}
+      />
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <input
