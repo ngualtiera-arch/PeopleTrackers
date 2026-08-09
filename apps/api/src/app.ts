@@ -9,6 +9,8 @@ import errorHandlerPlugin from './plugins/error-handler.js';
 import authRoutes from './routes/auth.routes.js';
 import healthRoutes from './routes/health.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
+import clientsRoutes from './routes/clients.routes.js';
+import agentsRoutes from './routes/agents.routes.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -23,6 +25,8 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(authRoutes);
   await app.register(settingsRoutes);
+  await app.register(clientsRoutes);
+  await app.register(agentsRoutes);
 
   return app;
 }
