@@ -10,8 +10,8 @@ apps/web       React + TS + Vite + Tailwind frontend
 apps/api       Fastify + TS REST backend
 packages/db    Prisma schema (spec §5), seed script (spec §7)
 packages/shared  Reference data, business constants, shared DTOs — single source of truth
-reports/       HTML/CSS report templates (Phase 4)
-scripts/load   One-off client/agent CSV load (spec §8, Phase 2 — not yet implemented)
+reports/       Case report templates (Phase 4) — Client/Agent report templates live in apps/api/src/reports
+scripts/load   One-off client/agent CSV load (spec §8)
 docs/          The build specification and reverse-engineering report
 ```
 
@@ -63,22 +63,35 @@ npm run dev:web                          # http://localhost:5173
 
 ## Status
 
-**Phase 1 (Foundations) complete and verified end-to-end against a live Supabase Postgres
-instance** (ap-southeast-2, via the session pooler — the direct `db.*.supabase.co` host is
-IPv6-only and unreachable from IPv4-only networks; use the pooler connection string from
-Project Settings → Database).
+**Phases 1 (Foundations) and 2 (Clients & Agents) complete**, verified end-to-end against a
+live Supabase Postgres instance (ap-southeast-2, via the session pooler — the direct
+`db.*.supabase.co` host is IPv6-only and unreachable from IPv4-only networks; use the pooler
+connection string from Project Settings → Database).
 
-Verified: migration applied cleanly (`packages/db/prisma/migrations/`), `post-migration.sql`
-applied (functional indexes, tsvector trigger, `cases_reference_seq` confirmed sitting at
-55982 per D9), seed produced the exact §7 reference data (5 packages, 4 case types, 7
-statuses with correct fee rules, 5 report templates) and the §2.2 settings (confirmed
-branding only — no ACN, no iTrace anything). A real admin login was exercised through the
-browser: sign-in, JWT cookies issued, redirect to main menu, role-gated Settings endpoint
-returned the correct data. All workspaces typecheck clean; the web app builds; the API's
-secure-by-default auth guard, Zod validation (400s), and sanitized error responses (no
-internals leaked on unexpected failures) were all exercised directly.
+**Phase 1:** schema, seed (reference data + §2.2 settings — confirmed branding only, no ACN,
+no iTrace anything), auth (Argon2id + JWT, secure-by-default route guard, admin/staff roles),
+app shell, keyboard layer.
 
-**Not yet built:** the client/agent CSV load script (`scripts/load`) is a stub — real
-implementation is Phase 2 scope (§23).
+**Phase 2:** the real client/agent CSV load (`scripts/load`) — every number in spec §8.5/§8.6
+confirmed exactly against the loaded data (689/35 records, reference ranges, needs_review
+breakdown, agent skill split, standard-package count); full CRUD API with Find ("begins with
+per word") and the needs-review filter; Clients and Agents list/detail screens with Prev/Next;
+and all six Client/Agent report outputs (Details, List, Envelope × 2) rendered via Playwright,
+letterhead/footer pulled from Settings, verified by generating and visually inspecting real
+PDFs against live data.
+
+Several real bugs were found and fixed by actually exercising the app end-to-end (browser +
+generated PDFs), not just from code review or `curl`: a CORS `methods` gap that silently broke
+every edit/delete in the browser, an empty-body `Content-Type` header that 400'd every delete,
+a search bug that only matched the start of a field instead of any word in it, and a PDF
+envelope orientation bug where `landscape: true` double-flipped already-landscape explicit
+dimensions into a tall portrait page.
+
+**Known gaps carried forward:** the report letterhead logo is a placeholder (§22, not yet
+supplied); the envelope page size is an unverified DL default (D14, no sample was supplied to
+check it against).
+
+**Not yet built:** Cases (Phase 3), the five case report outputs and Batch PDF (Phase 4),
+email (Phase 5), Settings UI / hardening (Phase 6).
 
 See `docs/PeopleTrackers_V1_Build_Specification.md` §23 for the full phase plan.
