@@ -1,0 +1,347 @@
+// Schema transcribed directly from V4 Build Specification §5.
+// Column names and constraints are the source of truth — do not "improve" naming
+// or add columns not present in the spec without an explicit decision.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  staff
+
+  @@map("user_role")
+}
+
+enum FeeRule {
+  zero
+  non_locate_rate
+  locate_rate
+
+  @@map("fee_rule")
+}
+
+enum AgentSkillCode {
+  skip_tracing
+  process_serving
+  debt_collection
+
+  @@map("agent_skill_code")
+}
+
+enum EmailStatus {
+  queued
+  sent
+  bounced
+  failed
+
+  @@map("email_status")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole
+  isActive     Boolean  @default(true) @map("is_active")
+  totpSecret   String?  @map("totp_secret")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Package {
+  id             String @id @default(uuid())
+  code           String @unique
+  name           String
+  locateRate     Decimal @map("locate_rate") @db.Decimal(12, 2)
+  nonLocateRate  Decimal @map("non_locate_rate") @db.Decimal(12, 2)
+  sortOrder      Int    @map("sort_order")
+
+  clients Client[]
+  cases   Case[]
+
+  @@map("packages")
+}
+
+model CaseType {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  locateRate     Decimal? @map("locate_rate") @db.Decimal(12, 2)
+  nonLocateRate  Decimal? @map("non_locate_rate") @db.Decimal(12, 2)
+  usesPackage    Boolean  @map("uses_package")
+  sortOrder      Int      @map("sort_order")
+
+  cases Case[]
+
+  @@map("case_types")
+}
+
+model CaseStatus {
+  id        String  @id @default(uuid())
+  code      String  @unique
+  name      String
+  sortOrder Int     @map("sort_order")
+  feeRule   FeeRule @map("fee_rule")
+
+  cases Case[]
+
+  @@map("case_statuses")
+}
+
+model Client {
+  id            String   @id @default(uuid())
+  reference     Int      @unique @default(autoincrement())
+
+  company       String?
+  contactName   String?  @map("contact_name")
+  kind          String?
+  phone         String?
+  fax           String?
+  email         String?
+  emailInvoice  String?  @map("email_invoice")
+  emailReports  String?  @map("email_reports")
+
+  addr1         String?
+  addr2         String?
+  city          String?
+  state         String?
+  postcode      String?
+  country       String   @default("Australia")
+
+  postalAddr1     String? @map("postal_addr1")
+  postalAddr2     String? @map("postal_addr2")
+  postalCity      String? @map("postal_city")
+  postalState     String? @map("postal_state")
+  postalPostcode  String? @map("postal_postcode")
+  postalCountry   String? @map("postal_country")
+
+  attention String?
+  terms     String?
+  abn       String?
+  notes     String?
+
+  packageId String?  @map("package_id")
+  package   Package? @relation(fields: [packageId], references: [id])
+
+  // Captured, unused — D1. Read by nothing in the rate engine.
+  fileFee       Decimal? @map("file_fee") @db.Decimal(12, 2)
+  locateFee     Decimal? @map("locate_fee") @db.Decimal(12, 2)
+  nonLocateFee  Decimal? @map("non_locate_fee") @db.Decimal(12, 2)
+  hourlyFee     Decimal? @map("hourly_fee") @db.Decimal(12, 2)
+
+  needsReview Boolean @default(false) @map("needs_review")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  cases Case[]
+
+  @@index([reference])
+  @@map("clients")
+}
+
+model Agent {
+  id        String @id @default(uuid())
+  reference Int    @unique @default(autoincrement())
+
+  name    String?
+  company String?
+
+  addr1    String?
+  addr2    String?
+  city     String?
+  state    String?
+  postcode String?
+  country  String?
+
+  phone  String?
+  mobile String? // stored, not displayed — D13
+  fax    String?
+  email  String?
+  notes  String?
+  rate   Decimal? @map("rate") @db.Decimal(12, 2) // stored, not displayed — D13
+
+  needsReview Boolean @default(false) @map("needs_review")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  skills AgentSkill[]
+  cases  Case[]
+
+  @@index([reference])
+  @@map("agents")
+}
+
+model AgentSkill {
+  agentId String         @map("agent_id")
+  agent   Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill   AgentSkillCode
+
+  @@id([agentId, skill])
+  @@map("agent_skills")
+}
+
+model Case {
+  id        String @id @default(uuid())
+  reference Int    @unique @default(autoincrement()) // starts 55982 — D9, set in seed
+
+  clientId String @map("client_id")
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  agentId String? @map("agent_id")
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  caseTypeId String   @map("case_type_id")
+  caseType   CaseType @relation(fields: [caseTypeId], references: [id])
+
+  statusId String     @map("status_id")
+  status   CaseStatus @relation(fields: [statusId], references: [id])
+
+  packageId String?  @map("package_id")
+  package   Package? @relation(fields: [packageId], references: [id])
+
+  clientRef String? @map("client_ref")
+
+  rateLocate    Decimal? @map("rate_locate") @db.Decimal(12, 2)
+  rateNonLocate Decimal? @map("rate_non_locate") @db.Decimal(12, 2)
+  fee           Decimal? @db.Decimal(12, 2)
+  units         Decimal  @default(1) @db.Decimal(10, 2)
+  amount        Decimal? @db.Decimal(12, 2)
+
+  dateEntered         DateTime  @map("date_entered") @db.Date
+  dateDue             DateTime? @map("date_due") @db.Date
+  dateClosed          DateTime? @map("date_closed") @db.Date
+  dateInstructionSent DateTime? @map("date_instruction_sent") @db.Date
+
+  reportSent Boolean @default(false) @map("report_sent")
+  invoiced   Boolean @default(false)
+
+  subjectTitle      String?   @map("subject_title")
+  subjectFirstname  String?   @map("subject_firstname")
+  subjectMiddlename String?   @map("subject_middlename")
+  subjectLastname   String?   @map("subject_lastname")
+  subjectGender     String?   @map("subject_gender")
+  subjectDob        DateTime? @map("subject_dob") @db.Date
+  subjectLicence    String?   @map("subject_licence")
+  subjectPhHome     String?   @map("subject_ph_home")
+  subjectPhMobile   String?   @map("subject_ph_mobile")
+  subjectPhWork     String?   @map("subject_ph_work")
+  subjectPhOther    String?   @map("subject_ph_other")
+
+  // The address the investigation CONFIRMED (source field: "Subject Address*")
+  confirmedAddr1    String? @map("confirmed_addr1")
+  confirmedAddr2    String? @map("confirmed_addr2")
+  confirmedCity     String? @map("confirmed_city")
+  confirmedState    String? @map("confirmed_state")
+  confirmedPostcode String? @map("confirmed_postcode")
+  confirmedCountry  String? @map("confirmed_country")
+
+  // The address the CLIENT supplied (source field: "Previous Address*")
+  lastKnownAddr1    String? @map("last_known_addr1")
+  lastKnownAddr2    String? @map("last_known_addr2")
+  lastKnownCity     String? @map("last_known_city")
+  lastKnownState    String? @map("last_known_state")
+  lastKnownPostcode String? @map("last_known_postcode")
+  lastKnownCountry  String? @map("last_known_country")
+
+  employer        String?
+  employerAddr1   String? @map("employer_addr1")
+  employerAddr2   String? @map("employer_addr2")
+  employerCity    String? @map("employer_city")
+  employerState   String? @map("employer_state")
+  employerPostcode String? @map("employer_postcode")
+  employerCountry String? @map("employer_country")
+  employerPhone   String? @map("employer_phone")
+  employerFax     String? @map("employer_fax")
+
+  additionalInfo String? @map("additional_info")
+  agentNotes     String? @map("agent_notes")
+  report         String?
+
+  // Maintained by a Postgres trigger on insert/update (raw SQL migration) — not written by the app.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  generatedDocuments GeneratedDocument[]
+  emailLogs          EmailLog[]
+
+  @@index([reference])
+  @@index([clientId])
+  @@index([agentId])
+  @@index([statusId])
+  @@index([dateEntered])
+  @@index([dateDue])
+  @@index([reportSent])
+  @@index([invoiced])
+  @@index([clientRef])
+  @@map("cases")
+}
+
+model ReportTemplate {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  body      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("report_templates")
+}
+
+model GeneratedDocument {
+  id          String   @id @default(uuid())
+  caseId      String   @map("case_id")
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  kind        String
+  filename    String
+  storageKey  String   @map("storage_key")
+  generatedAt DateTime @default(now()) @map("generated_at")
+  generatedBy String?  @map("generated_by")
+
+  emailLogs EmailLog[]
+
+  @@map("generated_documents")
+}
+
+model EmailLog {
+  id                String             @id @default(uuid())
+  caseId            String?            @map("case_id")
+  case              Case?              @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  documentId        String?            @map("document_id")
+  document          GeneratedDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  toAddress         String             @map("to_address")
+  subject           String
+  body              String
+  providerMessageId String?            @map("provider_message_id")
+  status            EmailStatus        @default(queued)
+  sentAt            DateTime?          @map("sent_at")
+  sentBy            String?            @map("sent_by")
+  error             String?
+
+  @@map("email_log")
+}
+
+model Setting {
+  key   String @id
+  value Json
+
+  @@map("settings")
+}
