@@ -14,7 +14,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
     credentials: 'include', // send the httpOnly session cookies
     headers: {
-      'Content-Type': 'application/json',
+      // Only when there's a body — Fastify's JSON body parser rejects an empty body as
+      // invalid JSON, so a bodyless DELETE with this header unconditionally set 400s.
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   });

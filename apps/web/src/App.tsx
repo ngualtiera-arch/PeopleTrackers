@@ -5,6 +5,10 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { Login } from './pages/Login';
 import { MainMenu } from './pages/MainMenu';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ClientsListPage } from './features/clients/ClientsListPage';
+import { ClientDetailPage } from './features/clients/ClientDetailPage';
+import { AgentsListPage } from './features/agents/AgentsListPage';
+import { AgentDetailPage } from './features/agents/AgentDetailPage';
 
 const queryClient = new QueryClient();
 
@@ -19,8 +23,10 @@ export function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<MainMenu />} />
               <Route path="/files" element={<PlaceholderPage title="Files" phase="Phase 3 — Cases" />} />
-              <Route path="/clients" element={<PlaceholderPage title="Clients" phase="Phase 2 — Clients & Agents" />} />
-              <Route path="/agents" element={<PlaceholderPage title="Agents" phase="Phase 2 — Clients & Agents" />} />
+              <Route path="/clients" element={<ClientsListPage />} />
+              <Route path="/clients/:id" element={<ClientDetailPage />} />
+              <Route path="/agents" element={<AgentsListPage />} />
+              <Route path="/agents/:id" element={<AgentDetailPage />} />
             </Route>
 
             <Route element={<ProtectedRoute requireRole="admin" />}>
