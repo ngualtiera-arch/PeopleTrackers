@@ -1,7 +1,21 @@
 import { z } from 'zod';
-import { CLIENT_KINDS, AGENT_SKILLS, type AgentSkillCode } from './reference-data.js';
+import {
+  CLIENT_KINDS,
+  AGENT_SKILLS,
+  CASE_TYPES,
+  CASE_STATUSES,
+  SUBJECT_TITLES,
+  SUBJECT_GENDERS,
+  CASE_SAVED_FILTERS,
+  type AgentSkillCode,
+  type CaseTypeCode,
+  type CaseStatusCode,
+} from './reference-data.js';
 
 const AGENT_SKILL_CODES = AGENT_SKILLS.map((s) => s.code) as [AgentSkillCode, ...AgentSkillCode[]];
+const CASE_TYPE_CODES = CASE_TYPES.map((t) => t.code) as [CaseTypeCode, ...CaseTypeCode[]];
+const CASE_STATUS_CODES = CASE_STATUSES.map((s) => s.code) as [CaseStatusCode, ...CaseStatusCode[]];
+const CASE_SAVED_FILTER_CODES = CASE_SAVED_FILTERS.map((f) => f.code) as [string, ...string[]];
 
 // Address fields are free text, not validated against the state/country value lists at the
 // schema level — §7 "Country is not restricted... state is free text" for non-Australian
@@ -77,4 +91,83 @@ export const agentListQuerySchema = z.object({
   needsReview: z.coerce.boolean().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const caseCreateSchema = z.object({
+  clientId: z.string().uuid(),
+  agentId: z.string().uuid().nullable().optional(),
+  caseTypeCode: z.enum(CASE_TYPE_CODES).optional(), // defaults to skip_tracing — §6.1
+  statusCode: z.enum(CASE_STATUS_CODES).optional(), // defaults to new_instruction — §6.1
+  clientRef: z.string().trim().max(200).nullable().optional(),
+  dateDue: z.string().nullable().optional(), // ISO date string; omit to use date_entered + 14 days — §6.1
+
+  subjectTitle: z.enum(SUBJECT_TITLES).nullable().optional(),
+  subjectFirstname: z.string().trim().max(100).nullable().optional(),
+  subjectMiddlename: z.string().trim().max(100).nullable().optional(),
+  subjectLastname: z.string().trim().max(100).nullable().optional(),
+  subjectGender: z.enum(SUBJECT_GENDERS).nullable().optional(),
+  subjectDob: z.string().nullable().optional(),
+  subjectLicence: z.string().trim().max(100).nullable().optional(),
+  subjectPhHome: z.string().trim().max(50).nullable().optional(),
+  subjectPhMobile: z.string().trim().max(50).nullable().optional(),
+  subjectPhWork: z.string().trim().max(50).nullable().optional(),
+  subjectPhOther: z.string().trim().max(50).nullable().optional(),
+
+  // The address the investigation CONFIRMED (source field "Subject Address*") — §5 naming note.
+  confirmedAddr1: z.string().trim().max(200).nullable().optional(),
+  confirmedAddr2: z.string().trim().max(200).nullable().optional(),
+  confirmedCity: z.string().trim().max(100).nullable().optional(),
+  confirmedState: z.string().trim().max(100).nullable().optional(),
+  confirmedPostcode: z.string().trim().max(20).nullable().optional(),
+  confirmedCountry: z.string().trim().max(100).nullable().optional(),
+
+  // The address the CLIENT supplied (source field "Previous Address*") — §5 naming note.
+  lastKnownAddr1: z.string().trim().max(200).nullable().optional(),
+  lastKnownAddr2: z.string().trim().max(200).nullable().optional(),
+  lastKnownCity: z.string().trim().max(100).nullable().optional(),
+  lastKnownState: z.string().trim().max(100).nullable().optional(),
+  lastKnownPostcode: z.string().trim().max(20).nullable().optional(),
+  lastKnownCountry: z.string().trim().max(100).nullable().optional(),
+
+  employer: z.string().trim().max(200).nullable().optional(),
+  employerAddr1: z.string().trim().max(200).nullable().optional(),
+  employerAddr2: z.string().trim().max(200).nullable().optional(),
+  employerCity: z.string().trim().max(100).nullable().optional(),
+  employerState: z.string().trim().max(100).nullable().optional(),
+  employerPostcode: z.string().trim().max(20).nullable().optional(),
+  employerCountry: z.string().trim().max(100).nullable().optional(),
+  employerPhone: z.string().trim().max(50).nullable().optional(),
+  employerFax: z.string().trim().max(50).nullable().optional(),
+
+  additionalInfo: z.string().nullable().optional(),
+  agentNotes: z.string().nullable().optional(),
+  report: z.string().nullable().optional(),
+
+  // Editable, but overwritten the next time a trigger field changes — §6.4. Not set on create
+  // (the engine always computes these from scratch for a new case).
+  units: z.number().positive().optional(),
+
+  reportSent: z.boolean().optional(),
+  invoiced: z.boolean().optional(),
+});
+
+export const caseUpdateSchema = caseCreateSchema.partial().extend({
+  clientId: z.string().uuid().optional(), // required on create, optional (but still changeable) on update
+  rateLocate: z.number().nullable().optional(),
+  rateNonLocate: z.number().nullable().optional(),
+  fee: z.number().nullable().optional(),
+  amount: z.number().nullable().optional(),
+});
+
+export const caseListQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
+  filter: z.enum(CASE_SAVED_FILTER_CODES).default('all'), // §12.2
+  sort: z.enum(['client', 'reference', 'dateDue', 'status', '-client', '-reference', '-dateDue', '-status']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const copyTemplateSchema = z.object({
+  templateCode: z.enum(['located', 'non_locate', 'leads_obtained', 'process_service', 'field_call']),
+  confirmReplace: z.boolean().optional(), // required true if the report field is already non-empty — §6.7
 });
