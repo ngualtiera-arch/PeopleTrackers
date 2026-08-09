@@ -14,7 +14,11 @@ export function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   if (user) {
-    const from = (location.state as { from?: string } | null)?.from ?? '/';
+    // §12.2: "On login the system opens on the case list with New Instruction applied" —
+    // reproduces the source's startup script. Only applies to a fresh login with no specific
+    // destination; a login triggered by hitting a protected route while logged out still
+    // returns the user to where they were headed.
+    const from = (location.state as { from?: string } | null)?.from ?? '/files';
     return <Navigate to={from} replace />;
   }
 

@@ -230,13 +230,15 @@ export async function computeUpdateFields(
 
   const statusChanged = 'statusCode' in input && input.statusCode !== existing.status.code;
   const effectiveStatusCode = (input.statusCode ?? existing.status.code) as CaseStatusCode;
+  // units is NOT NULL in the DB (default 1) — a cleared field (null) reverts to 1 rather than
+  // being written through as null, which Prisma would reject.
   const effectiveUnits = input.units ?? Number(existing.units);
 
   if (statusChanged) {
     fields.statusId = await caseStatusIdFor(effectiveStatusCode);
   }
   if ('units' in input) {
-    fields.units = input.units;
+    fields.units = input.units ?? 1;
   }
 
   // §6.4 — fee/amount recompute whenever status_id, rate_locate, rate_non_locate or units changes.

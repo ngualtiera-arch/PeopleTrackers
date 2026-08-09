@@ -143,9 +143,10 @@ export const caseCreateSchema = z.object({
   agentNotes: z.string().nullable().optional(),
   report: z.string().nullable().optional(),
 
-  // Editable, but overwritten the next time a trigger field changes — §6.4. Not set on create
-  // (the engine always computes these from scratch for a new case).
-  units: z.number().positive().optional(),
+  // Editable, but overwritten the next time a trigger field changes — §6.4. Nullable because
+  // the web form sends null (not omitted) for a blank numeric field; the engine treats
+  // null/undefined the same way (defaults to 1 on create — §6.1).
+  units: z.number().positive().nullable().optional(),
 
   reportSent: z.boolean().optional(),
   invoiced: z.boolean().optional(),

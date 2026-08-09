@@ -13,6 +13,7 @@ import clientsRoutes from './routes/clients.routes.js';
 import agentsRoutes from './routes/agents.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import casesRoutes from './routes/cases.routes.js';
+import templatesRoutes from './routes/templates.routes.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -35,6 +36,7 @@ export async function buildApp() {
   await app.register(agentsRoutes);
   await app.register(reportsRoutes);
   await app.register(casesRoutes);
+  await app.register(templatesRoutes);
 
   return app;
 }
