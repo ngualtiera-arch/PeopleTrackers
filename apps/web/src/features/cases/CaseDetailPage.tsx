@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   CASE_TYPES,
@@ -157,12 +157,40 @@ export function CaseDetailPage() {
     return payload;
   }
 
+  // Reproduces the source's actual behaviour: a FileMaker "New" record exists in the table the
+  // instant it's created — there's no unsaved-draft state to guard against, which is why the
+  // report-template buttons, Package, and email were never disabled there. A web form has no
+  // equivalent moment, so the closest honest match is: create the real record as soon as the
+  // one truly required field (Client) is picked, then quietly become the "editing an existing
+  // case" screen — everything unlocks immediately, same as the source, without littering the
+  // table with fully-blank rows for someone who picked New and then navigated away.
+  const autoCreating = useRef(false);
+  useEffect(() => {
+    if (!isNew || !client || autoCreating.current) return;
+    autoCreating.current = true;
+    (async () => {
+      try {
+        const payload = buildPayload();
+        payload.clientId = client.id;
+        const created = await createMutation.mutateAsync(payload);
+        navigate(`/files/${created.id}`, { replace: true, state });
+      } catch {
+        autoCreating.current = false; // let them fix whatever failed and retry by re-picking the client
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew, client]);
+
   async function handleSave() {
     if (isNew) {
       if (!client) {
         window.alert('Select a client first.');
         return;
       }
+      // Picking a client already triggers auto-create (above) — avoid a double-create race if
+      // Save is clicked in the brief window before that finishes.
+      if (autoCreating.current) return;
+      autoCreating.current = true;
       const payload = buildPayload();
       payload.clientId = client.id;
       const created = await createMutation.mutateAsync(payload);
