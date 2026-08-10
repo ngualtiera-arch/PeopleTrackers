@@ -11,6 +11,7 @@ export function ActionBar({
   onNew,
   onDelete,
   onPrint,
+  onBatchPdf,
   onPrev,
   onNext,
   prevNextLabel,
@@ -20,6 +21,7 @@ export function ActionBar({
   onNew?: () => void;
   onDelete?: () => void;
   onPrint?: () => void;
+  onBatchPdf?: () => void;
   onPrev?: () => void;
   onNext?: () => void;
   prevNextLabel?: string;
@@ -77,6 +79,11 @@ export function ActionBar({
         {onPrint && (
           <button className={buttonClass} onClick={onPrint}>
             Print
+          </button>
+        )}
+        {onBatchPdf && (
+          <button className={buttonClass} onClick={onBatchPdf}>
+            Batch PDF
           </button>
         )}
       </div>

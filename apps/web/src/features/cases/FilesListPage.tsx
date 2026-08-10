@@ -1,14 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CASE_SAVED_FILTERS } from '@peopletrackers/shared';
+import { CASE_SAVED_FILTERS, CASE_REPORT_OPTIONS, defaultReportChoice } from '@peopletrackers/shared';
 import { ActionBar } from '../../components/ActionBar';
+import { ReportChooserModal } from '../../components/ReportChooserModal';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { API_BASE } from '../../lib/api-client';
 import { useCasesList, type CaseListParams } from './api';
 
 function fmtDate(value: string | null): string {
   if (!value) return '';
   return new Date(value).toLocaleDateString('en-AU');
 }
+
+// §13.4 chooser: from the list screen, only the result-set report types apply — Batch PDF
+// (a separate action-bar button, §13.6) already covers "print the File Report for every
+// record being browsed".
+const LIST_REPORT_OPTIONS = CASE_REPORT_OPTIONS.filter((o) => o.scope === 'result_set');
+const REPORT_ENDPOINT: Record<string, string> = {
+  client_status_report: 'client-status',
+  file_list_by_agent: 'file-list-by-agent',
+};
 
 export function FilesListPage() {
   const navigate = useNavigate();
@@ -19,6 +30,8 @@ export function FilesListPage() {
   const [filter, setFilter] = useState<CaseListParams['filter']>('new_instruction');
   const [sort, setSort] = useState<CaseListParams['sort']>();
   const [page, setPage] = useState(1);
+  const [printChooserOpen, setPrintChooserOpen] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
 
   const { data, isLoading } = useCasesList({ search: search || undefined, filter, sort, page });
 
@@ -36,6 +49,46 @@ export function FilesListPage() {
     setSort((s) => (s === key ? (`-${key}` as CaseListParams['sort']) : key));
   }
 
+  function printResultSetReport(code: string) {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (filter && filter !== 'all') params.set('filter', filter);
+    const qs = params.toString();
+    window.open(`${API_BASE}/cases/report/${REPORT_ENDPOINT[code]}${qs ? `?${qs}` : ''}`, '_blank');
+    setPrintChooserOpen(false);
+  }
+
+  async function runBatchPdf() {
+    if (!data || data.total === 0) return;
+    if (!window.confirm(`Generate a batch PDF for ${data.total} case${data.total === 1 ? '' : 's'} and mark them all Report Sent?`)) {
+      return;
+    }
+    setBatchRunning(true);
+    try {
+      const res = await fetch(`${API_BASE}/cases/report/batch`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filter, search: search || undefined }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(body.message ?? 'Batch PDF failed.');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `batch_${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Batch PDF failed.');
+    } finally {
+      setBatchRunning(false);
+    }
+  }
+
   function sortIndicator(key: string) {
     if (sort === key) return '▲';
     if (sort === `-${key}`) return '▼';
@@ -44,7 +97,22 @@ export function FilesListPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <ActionBar onFind={() => document.getElementById('case-search')?.focus()} onNew={() => navigate('/files/new')} />
+      <ActionBar
+        onFind={() => document.getElementById('case-search')?.focus()}
+        onNew={() => navigate('/files/new')}
+        onPrint={() => setPrintChooserOpen(true)}
+        onBatchPdf={batchRunning ? undefined : runBatchPdf}
+      />
+
+      {printChooserOpen && (
+        <ReportChooserModal
+          title="Print"
+          options={LIST_REPORT_OPTIONS}
+          defaultCode={defaultReportChoice('list')}
+          onClose={() => setPrintChooserOpen(false)}
+          onChoose={printResultSetReport}
+        />
+      )}
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex gap-1">

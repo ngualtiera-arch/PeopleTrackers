@@ -8,12 +8,27 @@ import {
   AUSTRALIAN_STATES,
   DEFAULT_COUNTRY,
   REPORT_TEMPLATES,
+  CASE_REPORT_OPTIONS,
+  defaultReportChoice,
+  type CaseStatusCode,
 } from '@peopletrackers/shared';
 import { ActionBar } from '../../components/ActionBar';
+import { ReportChooserModal } from '../../components/ReportChooserModal';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
-import { apiFetch } from '../../lib/api-client';
+import { apiFetch, API_BASE } from '../../lib/api-client';
 import { TypeaheadPicker, type TypeaheadOption } from '../../components/TypeaheadPicker';
 import { useCase, useCreateCase, useUpdateCase, useDeleteCase, useCopyTemplate } from './api';
+
+// §13.4 chooser: from the case detail screen, scope is fixed to "Current Record" — switching
+// to "Records Being Browsed" (the underlying list's filtered set) is better reached from the
+// Files list itself, where that set is actually visible; only the single-record report types
+// apply here.
+const DETAIL_REPORT_OPTIONS = CASE_REPORT_OPTIONS.filter((o) => o.scope === 'single');
+const REPORT_ENDPOINT: Record<string, string> = {
+  case_report: '',
+  update_report: 'update_report',
+  agent_instruction: 'agent_instruction',
+};
 
 type FormState = Record<string, string>;
 
@@ -81,6 +96,7 @@ export function CaseDetailPage() {
   const [statusCode, setStatusCode] = useState<string>('new_instruction');
   const [reportSent, setReportSent] = useState(false);
   const [invoiced, setInvoiced] = useState(false);
+  const [printChooserOpen, setPrintChooserOpen] = useState(false);
 
   useEffect(() => {
     if (c) {
@@ -176,10 +192,25 @@ export function CaseDetailPage() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
         onDelete={isNew ? undefined : handleDelete}
+        onPrint={isNew ? undefined : () => setPrintChooserOpen(true)}
         onPrev={prevId ? () => navigate(`/files/${prevId}`, { state }) : undefined}
         onNext={nextId ? () => navigate(`/files/${nextId}`, { state }) : undefined}
         prevNextLabel={currentIndex >= 0 ? `${currentIndex + 1} of ${orderedIds.length}` : undefined}
       />
+
+      {printChooserOpen && (
+        <ReportChooserModal
+          title="Print"
+          options={DETAIL_REPORT_OPTIONS}
+          defaultCode={defaultReportChoice('detail', statusCode as CaseStatusCode)}
+          onClose={() => setPrintChooserOpen(false)}
+          onChoose={(code) => {
+            const suffix = REPORT_ENDPOINT[code];
+            window.open(`${API_BASE}/cases/${id}/report${suffix ? `?type=${suffix}` : ''}`, '_blank');
+            setPrintChooserOpen(false);
+          }}
+        />
+      )}
 
       <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-6 py-6">
         <div className="flex items-center justify-between">
