@@ -1,14 +1,22 @@
 import type { FastifyPluginAsync } from 'fastify';
+import JSZip from 'jszip';
 import { prisma } from '@peopletrackers/db';
 import { renderPdf } from '../reports/render.js';
-import { loadCompanySettings, buildLetterheadHeader, buildLetterheadFooter } from '../reports/layout.js';
+import { loadCompanySettings, buildLetterheadHeader, buildLetterheadFooter, buildAgentInstructionHeader } from '../reports/layout.js';
 import { buildBeginsWithSearch } from '../lib/search.js';
+import { buildCaseSearch, caseFilterWhere } from '../lib/case-search.js';
+import { CASE_INCLUDE } from './cases.routes.js';
 import { clientDetailsTemplate } from '../reports/templates/clientDetails.js';
 import { clientListTemplate } from '../reports/templates/clientList.js';
 import { clientEnvelopeTemplate } from '../reports/templates/clientEnvelope.js';
 import { agentDetailsTemplate } from '../reports/templates/agentDetails.js';
 import { agentListTemplate } from '../reports/templates/agentList.js';
 import { agentEnvelopeTemplate } from '../reports/templates/agentEnvelope.js';
+import { caseReportTemplate } from '../reports/templates/caseReport.js';
+import { updateReportTemplate } from '../reports/templates/updateReport.js';
+import { agentInstructionTemplate } from '../reports/templates/agentInstruction.js';
+import { clientStatusReportTemplate } from '../reports/templates/clientStatusReport.js';
+import { fileListByAgentTemplate } from '../reports/templates/fileListByAgent.js';
 
 const CLIENT_SEARCH_FIELDS = ['company', 'contactName', 'kind', 'email', 'phone', 'city', 'state'];
 const AGENT_SEARCH_FIELDS = ['name', 'company', 'email', 'phone', 'city', 'state'];
@@ -96,6 +104,118 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       footerHtml: buildLetterheadFooter(settings),
     });
     return sendPdf(reply, pdf, `${filenameBase}_details.pdf`);
+  });
+
+  // Case Report / File Update / Agent Instruction — single-record scope (§13.2 #1-3).
+  fastify.get<{ Params: { id: string }; Querystring: { type?: string } }>('/cases/:id/report', async (request, reply) => {
+    const c = await prisma.case.findUnique({ where: { id: request.params.id }, include: CASE_INCLUDE });
+    if (!c) return reply.notFound('Case not found.');
+
+    const settings = await loadCompanySettings();
+    const subjectName = [c.subjectFirstname, c.subjectLastname].filter(Boolean).join(' ').trim() || `case_${c.reference}`;
+    const filenameBase = `${(c.client.company ?? 'CLIENT').toUpperCase().replace(/\s+/g, '_')}_${subjectName.toLowerCase().replace(/\s+/g, '_')}`;
+
+    if (request.query.type === 'update_report') {
+      const pdf = await renderPdf(updateReportTemplate(c), {
+        headerHtml: buildLetterheadHeader(settings),
+        footerHtml: buildLetterheadFooter(settings),
+      });
+      return sendPdf(reply, pdf, `${filenameBase}_update.pdf`);
+    }
+
+    if (request.query.type === 'agent_instruction') {
+      // Hard requirement (§9.4): no client identifying information anywhere on this document.
+      const pdf = await renderPdf(agentInstructionTemplate(c), {
+        headerHtml: buildAgentInstructionHeader(settings),
+        footerHtml: buildLetterheadFooter(settings),
+      });
+      return sendPdf(reply, pdf, `${filenameBase}_agent_instruction.pdf`);
+    }
+
+    const pdf = await renderPdf(caseReportTemplate(c), {
+      headerHtml: buildLetterheadHeader(settings),
+      footerHtml: buildLetterheadFooter(settings),
+    });
+    return sendPdf(reply, pdf, `${filenameBase}.pdf`);
+  });
+
+  // Client Status Report / File List by Agent — result-set scope (§13.2 #4, #5).
+  fastify.get<{ Querystring: { filter?: string; search?: string } }>('/cases/report/client-status', async (request, reply) => {
+    const cases = await prisma.case.findMany({
+      where: {
+        ...caseFilterWhere(request.query.filter ?? 'all'),
+        ...(request.query.search ? buildCaseSearch(request.query.search) : {}),
+      },
+      include: CASE_INCLUDE,
+      orderBy: [{ status: { sortOrder: 'asc' } }, { dateEntered: 'asc' }], // §13.3: sorted by Status, then Date Entered
+    });
+    const pdf = await renderPdf(clientStatusReportTemplate(cases));
+    return sendPdf(reply, pdf, 'Client_Status_Report.pdf');
+  });
+
+  fastify.get<{ Querystring: { filter?: string; search?: string } }>('/cases/report/file-list-by-agent', async (request, reply) => {
+    const cases = await prisma.case.findMany({
+      where: {
+        ...caseFilterWhere(request.query.filter ?? 'all'),
+        ...(request.query.search ? buildCaseSearch(request.query.search) : {}),
+      },
+      include: CASE_INCLUDE,
+      // §13.3: sorted by Agent, then Status, then Date Entered.
+      orderBy: [{ agent: { name: 'asc' } }, { status: { sortOrder: 'asc' } }, { dateEntered: 'asc' }],
+    });
+    const pdf = await renderPdf(fileListByAgentTemplate(cases));
+    return sendPdf(reply, pdf, 'File_List.pdf');
+  });
+
+  // Batch PDF — spec §13.6. Renders the Case Report for every case in the current filtered
+  // set, sorted by client, and marks every case in that set report_sent = true.
+  fastify.post<{ Body: { filter?: string; search?: string } }>('/cases/report/batch', async (request, reply) => {
+    const filter = request.body?.filter ?? 'all';
+    const search = request.body?.search;
+    const where = {
+      ...caseFilterWhere(filter),
+      ...(search ? buildCaseSearch(search) : {}),
+    };
+
+    const cases = await prisma.case.findMany({
+      where,
+      include: CASE_INCLUDE,
+      orderBy: { client: { company: 'asc' } },
+    });
+
+    if (cases.length === 0) {
+      return reply.badRequest('No cases in the current set.');
+    }
+
+    const settings = await loadCompanySettings();
+    const zip = new JSZip();
+    const usedNames = new Set<string>();
+
+    for (const c of cases) {
+      const pdf = await renderPdf(caseReportTemplate(c), {
+        headerHtml: buildLetterheadHeader(settings),
+        footerHtml: buildLetterheadFooter(settings),
+      });
+
+      const subjectName = [c.subjectFirstname, c.subjectLastname].filter(Boolean).join(' ').trim() || `case_${c.reference}`;
+      let filename = `${(c.client.company ?? 'CLIENT').toUpperCase().replace(/\s+/g, '_')}_${subjectName.toLowerCase().replace(/\s+/g, '_')}.pdf`;
+      if (usedNames.has(filename)) {
+        filename = `${filename.replace(/\.pdf$/, '')}_${c.reference}.pdf`;
+      }
+      usedNames.add(filename);
+
+      zip.file(filename, pdf);
+    }
+
+    await prisma.case.updateMany({
+      where: { id: { in: cases.map((c) => c.id) } },
+      data: { reportSent: true },
+    });
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    reply.header('Content-Type', 'application/zip');
+    reply.header('Content-Disposition', `attachment; filename="batch_${new Date().toISOString().slice(0, 10)}.zip"`);
+    return reply.send(zipBuffer);
   });
 };
 

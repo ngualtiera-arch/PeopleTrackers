@@ -90,4 +90,39 @@ export function buildLetterheadFooter(settings: CompanySettings): string {
   `;
 }
 
+/**
+ * Agent Instruction's own header — confirmed from the supplied newinstructionstemplate.pdf
+ * sample: logo, postal address + security line, contact number/online/email. Deliberately
+ * omits the legal name/ABN block and the "PRIVATE AND CONFIDENTIAL" banner that every other
+ * report shows — this document goes to an external field agent, not the client, and the
+ * source sample simply doesn't carry them. Not itself a client-identity concern (§9.4 "must
+ * contain no client identifying information" is about the client's details, not the company's),
+ * just reproducing the observed layout.
+ */
+export function buildAgentInstructionHeader(settings: CompanySettings): string {
+  const logo = settings.logoUrl
+    ? `<img src="${escapeHtml(settings.logoUrl)}" style="height:40px;" />`
+    : `<div style="width:120px;height:40px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;color:#999;font-size:8px;">LOGO</div>`;
+
+  return `
+    <div style="width:100%;font-size:9px;font-family:Helvetica,Arial,sans-serif;color:#111;padding:0 24px;box-sizing:border-box;">
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="width:120px;vertical-align:top;">${logo}</td>
+          <td style="vertical-align:top;">
+            <div>${escapeHtml(settings.postalAddress)}</div>
+            <div>${escapeHtml(settings.officeByAppointmentLine)}</div>
+          </td>
+          <td style="vertical-align:top;text-align:right;">
+            <div>Contact Number: ${escapeHtml(settings.contactNumber)}</div>
+            <div>Online: ${escapeHtml(settings.website)}</div>
+            <div>Email: ${escapeHtml(settings.email)}</div>
+          </td>
+        </tr>
+      </table>
+      <hr style="border:none;border-top:1px solid #ccc;margin:6px 0 0 0;" />
+    </div>
+  `;
+}
+
 export const REPORT_BODY_FONT = `font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #111;`;

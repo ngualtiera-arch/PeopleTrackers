@@ -8,6 +8,7 @@ import {
   CONFIRMED_BUSINESS_DETAILS,
   DEFAULT_DAYS_UNTIL_DUE,
 } from '@peopletrackers/shared';
+import { TEMPLATE_BODIES } from './template-bodies.js';
 
 const prisma = new PrismaClient();
 
@@ -49,14 +50,16 @@ async function seedReferenceData() {
     });
   }
 
-  // Report template bodies are seeded EMPTY here — the verbatim text (spec §13.1/§22) must be
-  // captured from the live FileMaker TemplatesEdit screen before Phase 4 and loaded separately.
-  // Do not invent placeholder boilerplate text.
+  // Bodies extracted from the supplied sample report PDFs — see template-bodies.ts for
+  // per-template confidence notes. `process_service` has no sample and stays empty pending
+  // real content (§22). `update: body` so re-running the seed refreshes content if this file
+  // changes, rather than only applying on first insert.
   for (const t of REPORT_TEMPLATES) {
+    const body = TEMPLATE_BODIES[t.code] ?? '';
     await prisma.reportTemplate.upsert({
       where: { code: t.code },
-      update: {},
-      create: { code: t.code, name: t.buttonLabel, body: '' },
+      update: { body },
+      create: { code: t.code, name: t.buttonLabel, body },
     });
   }
 }

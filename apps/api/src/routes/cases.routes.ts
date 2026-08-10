@@ -1,30 +1,16 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { Prisma, prisma } from '@peopletrackers/db';
 import { caseCreateSchema, caseUpdateSchema, caseListQuerySchema, copyTemplateSchema } from '@peopletrackers/shared';
-import { buildCaseSearch } from '../lib/case-search.js';
+import { buildCaseSearch, caseFilterWhere } from '../lib/case-search.js';
 import { computeCreateFields, computeUpdateFields } from '../domain/case-service.js';
 
-const CASE_INCLUDE = {
+export const CASE_INCLUDE = {
   client: { include: { package: true } },
   agent: true,
   caseType: true,
   status: true,
   package: true,
 } satisfies Prisma.CaseInclude;
-
-/** §12.2 saved filters — case list. */
-function filterWhere(filter: string): Prisma.CaseWhereInput {
-  switch (filter) {
-    case 'new_instruction':
-      return { status: { code: 'new_instruction' } };
-    case 'to_report':
-      return { reportSent: false };
-    case 'to_invoice':
-      return { invoiced: false };
-    default:
-      return {};
-  }
-}
 
 function filterOrderBy(filter: string, sort?: string): Prisma.CaseOrderByWithRelationInput[] {
   if (sort) {
@@ -54,7 +40,7 @@ const casesRoutes: FastifyPluginAsync = async (fastify) => {
     const query = caseListQuerySchema.parse(request.query);
 
     const where: Prisma.CaseWhereInput = {
-      ...filterWhere(query.filter),
+      ...caseFilterWhere(query.filter),
       ...(query.search ? buildCaseSearch(query.search) : {}),
     };
 

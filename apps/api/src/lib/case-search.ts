@@ -13,6 +13,21 @@ import type { Prisma } from '@peopletrackers/db';
  * - date_entered / date_due are not included in free-text search — filtering by date is
  *   better served by the saved filters (§12.2) and column sort than a text field.
  */
+/** §12.2 saved filters — shared between the case list and the report endpoints, which both
+ *  need to render/act on "the current filtered set". */
+export function caseFilterWhere(filter: string): Prisma.CaseWhereInput {
+  switch (filter) {
+    case 'new_instruction':
+      return { status: { code: 'new_instruction' } };
+    case 'to_report':
+      return { reportSent: false };
+    case 'to_invoice':
+      return { invoiced: false };
+    default:
+      return {};
+  }
+}
+
 export function buildCaseSearch(query: string): Prisma.CaseWhereInput {
   const words = query.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return {};
