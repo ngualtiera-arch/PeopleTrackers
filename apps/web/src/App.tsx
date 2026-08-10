@@ -5,7 +5,6 @@ import { ApiError } from './lib/api-client';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { Login } from './pages/Login';
 import { MainMenu } from './pages/MainMenu';
-import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ClientsListPage } from './features/clients/ClientsListPage';
 import { ClientDetailPage } from './features/clients/ClientDetailPage';
 import { AgentsListPage } from './features/agents/AgentsListPage';
@@ -13,6 +12,7 @@ import { AgentDetailPage } from './features/agents/AgentDetailPage';
 import { FilesListPage } from './features/cases/FilesListPage';
 import { CaseDetailPage } from './features/cases/CaseDetailPage';
 import { TemplateEditorPage } from './features/templates/TemplateEditorPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 
 // Default retry:3 with exponential backoff makes sense for a flaky network, but retrying a
 // 4xx is never going to produce a different result. Without this, deleting a record whose
@@ -51,7 +51,7 @@ export function App() {
             </Route>
 
             <Route element={<ProtectedRoute requireRole="admin" />}>
-              <Route path="/settings" element={<PlaceholderPage title="Settings" phase="Phase 6 — Settings & hardening" />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
