@@ -14,6 +14,7 @@ import {
 } from '@peopletrackers/shared';
 import { ActionBar } from '../../components/ActionBar';
 import { ReportChooserModal } from '../../components/ReportChooserModal';
+import { EmailComposeModal, type EmailDefaults } from '../../components/EmailComposeModal';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { apiFetch, API_BASE } from '../../lib/api-client';
 import { TypeaheadPicker, type TypeaheadOption } from '../../components/TypeaheadPicker';
@@ -97,6 +98,8 @@ export function CaseDetailPage() {
   const [reportSent, setReportSent] = useState(false);
   const [invoiced, setInvoiced] = useState(false);
   const [printChooserOpen, setPrintChooserOpen] = useState(false);
+  const [emailReportOpen, setEmailReportOpen] = useState(false);
+  const [emailInstructionOpen, setEmailInstructionOpen] = useState(false);
 
   useEffect(() => {
     if (c) {
@@ -212,9 +215,48 @@ export function CaseDetailPage() {
         />
       )}
 
+      {emailReportOpen && id && (
+        <EmailComposeModal
+          title="Email Report"
+          attachmentNote="A PDF copy of the report will be attached."
+          loadDefaults={() => {
+            const chosen = defaultReportChoice('detail', statusCode as CaseStatusCode);
+            const reportType = chosen === 'update_report' ? 'update_report' : 'case_report';
+            return apiFetch<EmailDefaults>(`/cases/${id}/email/report-defaults?reportType=${reportType}`);
+          }}
+          onSend={async (values) => {
+            const chosen = defaultReportChoice('detail', statusCode as CaseStatusCode);
+            const reportType = chosen === 'update_report' ? 'update_report' : 'case_report';
+            await apiFetch(`/cases/${id}/email/report`, { method: 'POST', body: JSON.stringify({ reportType, ...values }) });
+          }}
+          onClose={() => setEmailReportOpen(false)}
+        />
+      )}
+
+      {emailInstructionOpen && id && (
+        <EmailComposeModal
+          title="Email Instruction"
+          attachmentNote="No attachment is sent with this email (matches the existing system)."
+          loadDefaults={() => apiFetch<EmailDefaults>(`/cases/${id}/email/agent-instruction-defaults`)}
+          onSend={async (values) => {
+            await apiFetch(`/cases/${id}/email/agent-instruction`, { method: 'POST', body: JSON.stringify(values) });
+          }}
+          onClose={() => setEmailInstructionOpen(false)}
+        />
+      )}
+
       <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-6 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-900">{isNew ? 'New File' : `File ${c?.reference}`}</h1>
+          {!isNew && (
+            <button
+              type="button"
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              onClick={() => setEmailReportOpen(true)}
+            >
+              Email Report
+            </button>
+          )}
         </div>
 
         {/* Header block — §9.4 */}
@@ -348,9 +390,10 @@ export function CaseDetailPage() {
             <h2 className="text-sm font-semibold text-slate-700">Agent Notes</h2>
             <button
               type="button"
-              disabled
-              title="Email available in Phase 5"
-              className="rounded-md border border-slate-200 px-3 py-1 text-xs text-slate-400"
+              disabled={isNew || !agent}
+              title={!agent ? 'Assign an agent first' : undefined}
+              className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
+              onClick={() => setEmailInstructionOpen(true)}
             >
               Email Instruction
             </button>
