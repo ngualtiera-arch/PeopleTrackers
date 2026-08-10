@@ -20,7 +20,7 @@ type CaseCreateInput = z.infer<typeof caseCreateSchema>;
 type CaseUpdateInput = z.infer<typeof caseUpdateSchema>;
 
 type CaseWithRelations = Prisma.CaseGetPayload<{
-  include: { client: { include: { package: true } }; caseType: true; status: true };
+  include: { client: { include: { package: true } }; caseType: true; status: true; package: true };
 }>;
 
 /**
@@ -186,10 +186,14 @@ export async function computeUpdateFields(
 
   const clientChanged = 'clientId' in input && input.clientId !== existing.clientId;
   const caseTypeChanged = 'caseTypeCode' in input && input.caseTypeCode !== existing.caseType.code;
+  const packageManuallyChanged = 'packageCode' in input && input.packageCode !== (existing.package?.code ?? null);
 
   if (clientChanged) fields.clientId = input.clientId;
 
   // §6.2/§6.3 — package + rate resolution, re-run whenever client_id or case_type_id changes.
+  // A client/type change always wins over a manual package pick made in the same request — same
+  // "replace existing value" trigger the source uses (§6.2), applied here to package too: a
+  // manual override only sticks on its own, and is silently discarded by the next trigger.
   let effectiveRateLocate = existing.rateLocate ? Number(existing.rateLocate) : 0;
   let effectiveRateNonLocate = existing.rateNonLocate ? Number(existing.rateNonLocate) : 0;
   let rateWasRecomputed = false;
@@ -214,6 +218,19 @@ export async function computeUpdateFields(
     if (caseTypeChanged) {
       fields.caseTypeId = await caseTypeIdFor(effectiveCaseTypeCode);
     }
+  } else if (packageManuallyChanged) {
+    // Manual override, no trigger fired this time — takes effect on its own, rates included
+    // (spec §6.3: rates recompute "whenever package_id or case_type_id changes", not only on
+    // client/type — a manual package pick is itself a package_id change).
+    const effectiveCaseTypeCode = existing.caseType.code as CaseTypeCode;
+    const rates = resolveRates(input.packageCode ?? null, effectiveCaseTypeCode);
+
+    fields.packageId = input.packageCode ? await packageIdFor(input.packageCode) : null;
+    fields.rateLocate = rates.rateLocate;
+    fields.rateNonLocate = rates.rateNonLocate;
+    effectiveRateLocate = rates.rateLocate;
+    effectiveRateNonLocate = rates.rateNonLocate;
+    rateWasRecomputed = true;
   }
 
   // A manual rate edit not accompanied by a client/case-type change — apply as given.

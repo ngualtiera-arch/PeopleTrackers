@@ -13,10 +13,11 @@ const TODAY_LONG = () =>
   new Date().toLocaleDateString('en-AU', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
 /**
- * Update Report — spec §13.2 #2, §13.3. Confirmed verbatim against updatereport.pdf, including
- * the outro — which is genuinely TRUNCATED in the supplied sample (spec §22 flags this
- * explicitly as content still to be captured). The paragraph below ends exactly where the
- * sample cuts off; do not invent the missing continuation.
+ * Update Report — spec §13.2 #2, §13.3. Confirmed verbatim against updatereport.pdf. The outro
+ * paragraph was originally truncated in the first supplied sample; a second, complete sample
+ * for the same case (Filemaker "Layout" folder, file update.pdf) supplied the real ending —
+ * "...WITH ANY NEW OR ADDITIONAL INFORMATION YOU MAY HAVE IN REGARD TO THIS MATTER." — used
+ * verbatim below, not invented.
  */
 export function updateReportTemplate(c: CaseWithRelations): string {
   return `
@@ -50,11 +51,9 @@ export function updateReportTemplate(c: CaseWithRelations): string {
 
       <div>${escapeMultiline(c.report)}</div>
 
-      <!-- TODO §22: outro truncated in the supplied sample — capture the full paragraph from
-           the live TemplatesEdit screen before go-live. -->
       <p style="margin-top:16px;">FURTHER SEARCHES AND ENQUIRIES WILL BE MADE ON THIS FILE AND WE WILL
       NOTIFY YOU OF OUR FINDINGS AT OUR EARLIEST CONVENIENCE. PLEASE DO NOT HESITATE TO CONTACT OUR OFFICE
-      WITH ANY NEW OR&hellip;</p>
+      WITH ANY NEW OR ADDITIONAL INFORMATION YOU MAY HAVE IN REGARD TO THIS MATTER.</p>
 
       <p style="margin-top:16px;">We trust this information is of assistance and thank you for your instructions.</p>
       <p>Yours truly,</p>

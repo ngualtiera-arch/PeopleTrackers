@@ -4,16 +4,19 @@ import {
   AGENT_SKILLS,
   CASE_TYPES,
   CASE_STATUSES,
+  PACKAGES,
   SUBJECT_TITLES,
   SUBJECT_GENDERS,
   CASE_SAVED_FILTERS,
   type AgentSkillCode,
   type CaseTypeCode,
   type CaseStatusCode,
+  type PackageCode,
 } from './reference-data.js';
 
 const AGENT_SKILL_CODES = AGENT_SKILLS.map((s) => s.code) as [AgentSkillCode, ...AgentSkillCode[]];
 const CASE_TYPE_CODES = CASE_TYPES.map((t) => t.code) as [CaseTypeCode, ...CaseTypeCode[]];
+const PACKAGE_CODES = PACKAGES.map((p) => p.code) as [PackageCode, ...PackageCode[]];
 const CASE_STATUS_CODES = CASE_STATUSES.map((s) => s.code) as [CaseStatusCode, ...CaseStatusCode[]];
 const CASE_SAVED_FILTER_CODES = CASE_SAVED_FILTERS.map((f) => f.code) as [string, ...string[]];
 
@@ -158,6 +161,10 @@ export const caseUpdateSchema = caseCreateSchema.partial().extend({
   rateNonLocate: z.number().nullable().optional(),
   fee: z.number().nullable().optional(),
   amount: z.number().nullable().optional(),
+  // Manual Package override, update-only — reproduces the source's actual behaviour: pick a
+  // different Package from the list, and it sticks until the next Client or Type change
+  // recomputes and silently overwrites it (§6.2's "replace existing value" trigger).
+  packageCode: z.enum(PACKAGE_CODES).nullable().optional(),
 });
 
 export const caseListQuerySchema = z.object({

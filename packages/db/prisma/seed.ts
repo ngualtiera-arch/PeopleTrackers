@@ -51,25 +51,26 @@ async function seedReferenceData() {
   }
 
   // Bodies extracted from the supplied sample report PDFs — see template-bodies.ts for
-  // per-template confidence notes. `process_service` has no sample and stays empty pending
-  // real content (§22). `update: body` so re-running the seed refreshes content if this file
-  // changes, rather than only applying on first insert.
+  // per-template confidence notes. `update: {}` (create-only) — the Template Editor screen
+  // (§9.9) lets an admin edit these bodies for real once the app is live, and re-running this
+  // seed script must never silently overwrite that. (Previously used `update: { body }` to
+  // refresh content during active development, before that screen existed — caught the hard
+  // way when a reseed for a content fix elsewhere also wiped a manually-set logo, see the
+  // company Setting below.)
   for (const t of REPORT_TEMPLATES) {
     const body = TEMPLATE_BODIES[t.code] ?? '';
     await prisma.reportTemplate.upsert({
       where: { code: t.code },
-      update: { body },
+      update: {},
       create: { code: t.code, name: t.buttonLabel, body },
     });
   }
 }
 
-// `update` mirrors `create` for every Setting below — matching the report_templates fix
-// above, so that re-running the seed after editing a default here actually refreshes it,
-// rather than only applying on first insert. Fine pre-launch, where this script is the only
-// thing writing these rows; it must NOT be re-run against a live production DB once the
-// Settings screen (Phase 6) lets an admin edit these for real — that would silently overwrite
-// their changes.
+// `update: {}` (create-only) for every Setting below — the Settings screen (§9.10) lets an
+// admin edit every one of these for real, so re-running this seed script must never silently
+// overwrite their changes. Confirmed the hard way: reseeding for an unrelated content fix wiped
+// a logo that had been set through the Settings screen minutes earlier.
 async function seedSettings() {
   const company = {
     legalName: CONFIRMED_BUSINESS_DETAILS.legalName,
@@ -88,7 +89,7 @@ async function seedSettings() {
   };
   await prisma.setting.upsert({
     where: { key: 'company' },
-    update: { value: company },
+    update: {},
     create: { key: 'company', value: company },
   });
 
@@ -100,7 +101,7 @@ async function seedSettings() {
   };
   await prisma.setting.upsert({
     where: { key: 'defaults' },
-    update: { value: defaults },
+    update: {},
     create: { key: 'defaults', value: defaults },
   });
 
@@ -121,7 +122,7 @@ async function seedSettings() {
   };
   await prisma.setting.upsert({
     where: { key: 'email' },
-    update: { value: email },
+    update: {},
     create: { key: 'email', value: email },
   });
 }

@@ -10,11 +10,15 @@ function subjectFullName(c: CaseWithRelations): string {
 }
 
 /**
- * Client Status Report — spec §13.2 #4, §13.3. Confirmed against clientstatusreport.pdf: no
- * letterhead/footer, just a title + date and the table — deliberately simpler than the
- * client-facing letter reports.
+ * Client Status Report — spec §13.2 #4, §13.3. No page header/footer, just a title + date and
+ * the table — deliberately simpler than the client-facing letter reports. The logo sits inline
+ * in the title row itself rather than as a Playwright page header (confirmed from a real
+ * sample, Filemaker "Layout" folder, client status report.pdf).
  */
-export function clientStatusReportTemplate(cases: CaseWithRelations[]): string {
+export function clientStatusReportTemplate(cases: CaseWithRelations[], logoUrl?: string | null): string {
+  const logo = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" style="height:36px;" />`
+    : '';
   const rows = cases
     .map(
       (c) => `
@@ -32,7 +36,12 @@ export function clientStatusReportTemplate(cases: CaseWithRelations[]): string {
 
   return `
     <div style="${REPORT_BODY_FONT}">
-      <h1 style="font-size:16px;margin:0 0 12px 0;">Client Status Report ${new Date().toLocaleDateString('en-AU')}</h1>
+      <table style="width:100%;margin-bottom:12px;">
+        <tr>
+          <td style="vertical-align:middle;"><h1 style="font-size:16px;margin:0;">Client Status Report ${new Date().toLocaleDateString('en-AU')}</h1></td>
+          <td style="text-align:right;vertical-align:middle;">${logo}</td>
+        </tr>
+      </table>
       <table style="width:100%;">
         <thead>
           <tr style="text-align:left;font-size:9px;text-transform:uppercase;color:#666;">

@@ -180,7 +180,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       return sendCsv(reply, csv, 'Client_Status_Report.csv');
     }
 
-    const pdf = await renderPdf(clientStatusReportTemplate(cases));
+    const settings = await loadCompanySettings();
+    const pdf = await renderPdf(clientStatusReportTemplate(cases, settings.logoUrl));
     return sendPdf(reply, pdf, 'Client_Status_Report.pdf');
   });
 

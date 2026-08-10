@@ -1,21 +1,29 @@
 /**
  * Verbatim report template bodies — spec §13.1/§22.
  *
- * Extracted directly from the supplied sample report PDFs (skipreport.pdf, updatereport.pdf,
- * fieldcallreport.pdf — see docs/PeopleTrackers_V1_Build_Specification.md Appendix), which show
- * a real historical case (OUR REF 55418) with these bodies pasted into its Report field.
- * `located`, `leads_obtained` and `non_locate` are cross-confirmed identical across TWO
- * independent samples (skipreport.pdf and updatereport.pdf) — high confidence. `field_call` is
- * confirmed complete and self-contained from fieldcallreport.pdf.
+ * Round 1 extracted from the supplied sample report PDFs (skipreport.pdf, updatereport.pdf,
+ * fieldcallreport.pdf), showing a real historical case (OUR REF 55418) with these bodies pasted
+ * into its Report field.
  *
- * `process_service` has NO sample in the supplied material — spec §13.1 only describes it
- * vaguely as "service-of-documents result wording". Left empty rather than inventing content;
- * must be captured from the live TemplatesEdit screen before go-live.
+ * Round 2 — a direct screenshot of the live TemplatesEdit screen (Filemaker "Layout" folder,
+ * templates.pdf) plus three more real completed reports for the SAME case (55418) reusing the
+ * `field_call` button. This resolved two real bugs from round 1:
  *
- * The trailing disclaimer block ("We also provide Surveillance...through...listed within this
- * report.") appears once, after the Non Locate / Search Result Notes / Legal Matters sections,
- * in both samples — attached here to `non_locate` as its tail. This is an inference from the
- * sample structure, not independently verified against the live TemplatesEdit screen.
+ *   - `field_call` and `process_service` were swapped. The "serve Legal Documents... Affidavit"
+ *     text (round 1's `field_call`) is actually Process Service — TemplatesEdit's own "Field
+ *     Call" button, independently confirmed by THREE separate real report samples in round 2
+ *     (file update.pdf, print file report.pdf, and TemplatesEdit itself), is "perform a field
+ *     call... RESULT: Confirmed / Unconfirmed / Relocated / Information Obtained".
+ *   - `leads_obtained` had drifted from the current master wording — TemplatesEdit is the
+ *     button's actual live source, so it wins over the one historical case's saved (and
+ *     possibly hand-edited) report text.
+ *
+ * `located` and `non_locate` are unchanged — TemplatesEdit's "Skip Trace Report" matches round
+ * 1's `located` almost verbatim, re-confirming it.
+ *
+ * TemplatesEdit also shows a "Quick Search Report" button/body that isn't one of the five
+ * buttons actually used (confirmed separately, on camera, narrating exactly five) — left out
+ * deliberately, not a missing sixth template.
  */
 export const TEMPLATE_BODIES: Record<string, string> = {
   located: `REPORT SUMMARY
@@ -31,12 +39,13 @@ Source / Method of Confirmation:
 Further searches have identified the following information in relation to the subject:
 `,
 
-  leads_obtained: `LEADS OBTAINED
+  leads_obtained: `Thank you for your instructions regarding this matter. We have conducted thorough searches based on the information you provided, utilising all available databases and making numerous phone inquiries in an effort to establish a new address for the subject. Unfortunately, we have not yet succeeded in confirming a new address.
 
-We have found a possible address for the subject at:
+During our investigation, we identified a possible address for the subject at XXXXXXXXX.
 
+However, we cannot confirm that this is the correct individual, as we have not been able to verify the date of birth or previous details.
 
-Unfortunately we have not been able to speak to anyone to verify if this is still correct. Based on this information we recommend a field call to the address.`,
+We recommend conducting a field call to further investigate this information.`,
 
   non_locate: `NOT LOCATED RESULTS
 
@@ -107,13 +116,17 @@ Clients are advised to independently verify all details prior to relying on the 
 
 All appropriate precautions should be exercised when attempting to contact the subject or attending any address listed within this report.`,
 
-  process_service: '',
-
-  field_call: `Thank you for your instruction in this matter to serve Legal Documents on XXXXXX at the address XXXXXx
+  process_service: `Thank you for your instruction in this matter to serve Legal Documents on XXXXXX at the address XXXXXx
 
 RESULT:  Served / Unserved / Information Obtained
 
 Our agent attended the given address on XXXX at XXXXXXam/pm
 
 Affidavit has been completed for this file and will be forwarded to your office.`,
+
+  field_call: `Thank you for your instruction in this matter to perform a field call on XXXXXX at the address XXXXXx
+
+RESULT: Confirmed / Unconfirmed / Relocated / Information Obtained
+
+Our agent attended the given address on XXXX at XXXXXXam/pm`,
 };

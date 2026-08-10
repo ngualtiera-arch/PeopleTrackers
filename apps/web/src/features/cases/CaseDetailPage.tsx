@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   CASE_TYPES,
   CASE_STATUSES,
+  PACKAGES,
   SUBJECT_TITLES,
   SUBJECT_GENDERS,
   AUSTRALIAN_STATES,
@@ -108,6 +109,7 @@ export function CaseDetailPage() {
   const [client, setClient] = useState<TypeaheadOption | null>(null);
   const [agent, setAgent] = useState<TypeaheadOption | null>(null);
   const [caseTypeCode, setCaseTypeCode] = useState<string>('skip_tracing');
+  const [packageCode, setPackageCode] = useState<string>('');
   const [statusCode, setStatusCode] = useState<string>('new_instruction');
   const [reportSent, setReportSent] = useState(false);
   const [invoiced, setInvoiced] = useState(false);
@@ -128,6 +130,7 @@ export function CaseDetailPage() {
       setClient({ id: c.client.id, label: c.client.company ?? c.client.contactName ?? `#${c.client.reference}` });
       setAgent(c.agent ? { id: c.agent.id, label: c.agent.name ?? `#${c.agent.reference}` } : null);
       setCaseTypeCode(c.caseType.code);
+      setPackageCode(c.package?.code ?? '');
       setStatusCode(c.status.code);
       setReportSent(c.reportSent);
       setInvoiced(c.invoiced);
@@ -167,6 +170,9 @@ export function CaseDetailPage() {
     } else {
       const payload = buildPayload();
       if (client) payload.clientId = client.id;
+      // Update-only (§6.2) — manually picking a Package sticks until the next Client/Type
+      // change recomputes and overwrites it, matching the source exactly.
+      payload.packageCode = packageCode || null;
       await updateMutation.mutateAsync(payload);
     }
   }
@@ -310,8 +316,16 @@ export function CaseDetailPage() {
               <input className={`${inputClass} bg-slate-50`} value={c?.dateEntered ? new Date(c.dateEntered).toLocaleDateString('en-AU') : '—'} disabled />
             </Field>
             <Field label="Date Due"><input type="date" className={inputClass} value={form.dateDue ?? ''} onChange={(e) => set('dateDue', e.target.value)} /></Field>
-            <Field label="Package" hint="Computed from client + type — not directly editable.">
-              <input className={`${inputClass} bg-slate-50`} value={c?.package?.name ?? '—'} disabled />
+            <Field label="Package" hint={isNew ? 'Computed once the case is saved.' : 'Auto-recomputed whenever Client or Type changes — a manual pick here is overwritten then.'}>
+              <select
+                className={`${inputClass} ${isNew ? 'bg-slate-50' : ''}`}
+                value={packageCode}
+                disabled={isNew}
+                onChange={(e) => setPackageCode(e.target.value)}
+              >
+                <option value="">—</option>
+                {PACKAGES.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+              </select>
             </Field>
             <Field label="Rate 1 (Locate)"><input type="number" step="0.01" className={inputClass} value={form.rateLocate ?? ''} onChange={(e) => set('rateLocate', e.target.value)} /></Field>
             <Field label="Rate 2 (Non Locate)"><input type="number" step="0.01" className={inputClass} value={form.rateNonLocate ?? ''} onChange={(e) => set('rateNonLocate', e.target.value)} /></Field>
