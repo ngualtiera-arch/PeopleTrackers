@@ -11,6 +11,10 @@ const schema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Optional — Supabase Storage for emailed-report PDFs (§13.5, §17). Both unset falls back to
+  // local disk (dev/test only, see storage/localDiskStorage.ts); set both to switch over.
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

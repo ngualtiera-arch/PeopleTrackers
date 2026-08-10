@@ -98,8 +98,10 @@ code):**
 
 **Go-live checklist — deployment/infra, not application code:**
 - [ ] Real transactional email provider + verified sending domain (SPF/DKIM/DMARC) — D6, §14.3
-- [ ] Supabase Storage wired in for emailed-PDF storage, replacing the local-disk dev stand-in
-      (needs a service-role key, not available while building this — see `apps/api/src/storage/storage.ts`)
+- [ ] Supabase Storage — code is ready (`apps/api/src/storage/supabaseStorage.ts`), just needs
+      `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` (Project Settings → API
+      Keys → `service_role`) and the `case-reports` bucket created (private) in the Supabase
+      dashboard's Storage section. Falls back to local disk automatically until both are set.
 - [ ] Automated daily encrypted backups with a **tested** restore (§17) — Supabase-managed
 - [ ] Confirm TLS/HSTS at the hosting layer (Netlify handles this by default)
 - [ ] Confirm encryption at rest (Supabase-managed)
