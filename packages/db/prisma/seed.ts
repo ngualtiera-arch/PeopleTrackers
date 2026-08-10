@@ -64,60 +64,65 @@ async function seedReferenceData() {
   }
 }
 
+// `update` mirrors `create` for every Setting below — matching the report_templates fix
+// above, so that re-running the seed after editing a default here actually refreshes it,
+// rather than only applying on first insert. Fine pre-launch, where this script is the only
+// thing writing these rows; it must NOT be re-run against a live production DB once the
+// Settings screen (Phase 6) lets an admin edit these for real — that would silently overwrite
+// their changes.
 async function seedSettings() {
+  const company = {
+    legalName: CONFIRMED_BUSINESS_DETAILS.legalName,
+    tradingAs: CONFIRMED_BUSINESS_DETAILS.tradingAs,
+    abn: CONFIRMED_BUSINESS_DETAILS.abn,
+    secondaryAbn: CONFIRMED_BUSINESS_DETAILS.secondaryAbn,
+    acn: CONFIRMED_BUSINESS_DETAILS.acn,
+    email: CONFIRMED_BUSINESS_DETAILS.email,
+    website: CONFIRMED_BUSINESS_DETAILS.website,
+    additionalWebsite: CONFIRMED_BUSINESS_DETAILS.additionalWebsite,
+    postalAddress: CONFIRMED_BUSINESS_DETAILS.postalAddress,
+    contactNumber: CONFIRMED_BUSINESS_DETAILS.contactNumber,
+    confidentialityLine: CONFIRMED_BUSINESS_DETAILS.confidentialityLine,
+    officeByAppointmentLine: CONFIRMED_BUSINESS_DETAILS.officeByAppointmentLine,
+    logoUrl: null, // supplied per §22, not yet available
+  };
   await prisma.setting.upsert({
     where: { key: 'company' },
-    update: {},
-    create: {
-      key: 'company',
-      value: {
-        legalName: CONFIRMED_BUSINESS_DETAILS.legalName,
-        tradingAs: CONFIRMED_BUSINESS_DETAILS.tradingAs,
-        abn: CONFIRMED_BUSINESS_DETAILS.abn,
-        secondaryAbn: CONFIRMED_BUSINESS_DETAILS.secondaryAbn,
-        acn: CONFIRMED_BUSINESS_DETAILS.acn,
-        email: CONFIRMED_BUSINESS_DETAILS.email,
-        website: CONFIRMED_BUSINESS_DETAILS.website,
-        additionalWebsite: CONFIRMED_BUSINESS_DETAILS.additionalWebsite,
-        postalAddress: CONFIRMED_BUSINESS_DETAILS.postalAddress,
-        contactNumber: CONFIRMED_BUSINESS_DETAILS.contactNumber,
-        confidentialityLine: CONFIRMED_BUSINESS_DETAILS.confidentialityLine,
-        officeByAppointmentLine: CONFIRMED_BUSINESS_DETAILS.officeByAppointmentLine,
-        logoUrl: null, // supplied per §22, not yet available
-      },
-    },
+    update: { value: company },
+    create: { key: 'company', value: company },
   });
 
+  const defaults = {
+    defaultAgentId: null, // source hard-codes one agent — set once agents are loaded (§6.1)
+    defaultCaseType: 'skip_tracing',
+    defaultStatus: 'new_instruction',
+    daysUntilDue: DEFAULT_DAYS_UNTIL_DUE,
+  };
   await prisma.setting.upsert({
     where: { key: 'defaults' },
-    update: {},
-    create: {
-      key: 'defaults',
-      value: {
-        defaultAgentId: null, // source hard-codes one agent — set once agents are loaded (§6.1)
-        defaultCaseType: 'skip_tracing',
-        defaultStatus: 'new_instruction',
-        daysUntilDue: DEFAULT_DAYS_UNTIL_DUE,
-      },
-    },
+    update: { value: defaults },
+    create: { key: 'defaults', value: defaults },
   });
 
+  const email = {
+    provider: null, // deployment configuration item — D6, §14.3
+    sendingDomain: null,
+    fromAddress: null,
+    replyTo: null,
+    // Emailing a report is new functionality (§14.1: "The existing system cannot email a
+    // report") — there's no existing wording to reproduce, so this is a sensible editable
+    // default, not a captured verbatim text like the report templates.
+    reportEmailSubject: 'Your report — {case_reference}',
+    reportEmailBody:
+      'Dear {client_contact_name},\n\nPlease find attached our report regarding {subject_full_name} (Our Ref: {case_reference}, Your Ref: {client_ref}).\n\nIf you have any queries regarding this report, please do not hesitate to contact our office.\n\nKind regards,\nPeople Trackers Australia',
+    // Opening line is spec-given verbatim (§14.2); subject details are appended at send time.
+    agentInstructionSubject: 'Agent Instruction : {case_reference}',
+    agentInstructionBody: 'Hi {agent_first_name},\n\nPlease attempt to locate the following subject',
+  };
   await prisma.setting.upsert({
     where: { key: 'email' },
-    update: {},
-    create: {
-      key: 'email',
-      value: {
-        provider: null, // deployment configuration item — D6, §14.3
-        sendingDomain: null,
-        fromAddress: null,
-        replyTo: null,
-        reportEmailSubject: '',
-        reportEmailBody: '',
-        agentInstructionSubject: 'Agent Instruction : {case_reference}',
-        agentInstructionBody: '',
-      },
-    },
+    update: { value: email },
+    create: { key: 'email', value: email },
   });
 }
 

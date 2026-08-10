@@ -132,6 +132,11 @@ const casesRoutes: FastifyPluginAsync = async (fastify) => {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
         return reply.notFound('Case not found.');
       }
+      // generated_documents.caseId is ON DELETE RESTRICT (schema.prisma) — a case with an
+      // emailed-report history can't be deleted, same protection as client/agent delete.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        return reply.conflict('This case has an emailed report on file and cannot be deleted.');
+      }
       throw err;
     }
     return reply.status(204).send();

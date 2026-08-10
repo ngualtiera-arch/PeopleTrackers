@@ -11,3 +11,4 @@ coverage/
 packages/db/prisma/dev.db
 packages/db/generated/
 *.tsbuildinfo
+storage-data/
