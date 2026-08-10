@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
@@ -26,6 +28,13 @@ export async function buildApp() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
+  // §17 hardening. CSP off: this is a JSON/PDF API with no HTML responses of its own to
+  // protect — the other headers (X-Content-Type-Options, X-Frame-Options, HSTS, etc.) still apply.
+  await app.register(helmet, { contentSecurityPolicy: false });
+  // Global safety net against brute-force/scraping; login gets a much tighter override below
+  // on top of its own existing per-email lockout (auth.routes.ts) — this is IP-based defense
+  // in depth, not a replacement for it.
+  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
   await app.register(sensible);
   await app.register(cookie);
   await app.register(jwt, { secret: env.JWT_ACCESS_SECRET });

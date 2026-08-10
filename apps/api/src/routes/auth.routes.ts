@@ -34,50 +34,54 @@ function setAuthCookies(reply: import('fastify').FastifyReply, accessToken: stri
 }
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post('/auth/login', { config: { public: true } }, async (request, reply) => {
-    const body = loginSchema.parse(request.body);
-    const key = body.email.toLowerCase();
+  fastify.post(
+    '/auth/login',
+    { config: { public: true, rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const body = loginSchema.parse(request.body);
+      const key = body.email.toLowerCase();
 
-    const attempt = failedAttempts.get(key);
-    if (attempt?.lockedUntil && attempt.lockedUntil > Date.now()) {
-      return reply.tooManyRequests('Account temporarily locked after repeated failed attempts.');
-    }
-
-    const user = await prisma.user.findUnique({ where: { email: key } });
-
-    const fail = () => {
-      const next = { count: (attempt?.count ?? 0) + 1, lockedUntil: null as number | null };
-      if (next.count >= MAX_ATTEMPTS) {
-        next.lockedUntil = Date.now() + LOCKOUT_MS;
+      const attempt = failedAttempts.get(key);
+      if (attempt?.lockedUntil && attempt.lockedUntil > Date.now()) {
+        return reply.tooManyRequests('Account temporarily locked after repeated failed attempts.');
       }
-      failedAttempts.set(key, next);
-      return reply.unauthorized('Invalid email or password.');
-    };
 
-    if (!user || !user.isActive) {
-      return fail();
-    }
+      const user = await prisma.user.findUnique({ where: { email: key } });
 
-    const passwordOk = await argon2.verify(user.passwordHash, body.password);
-    if (!passwordOk) {
-      return fail();
-    }
+      const fail = () => {
+        const next = { count: (attempt?.count ?? 0) + 1, lockedUntil: null as number | null };
+        if (next.count >= MAX_ATTEMPTS) {
+          next.lockedUntil = Date.now() + LOCKOUT_MS;
+        }
+        failedAttempts.set(key, next);
+        return reply.unauthorized('Invalid email or password.');
+      };
 
-    if (user.totpSecret) {
-      if (!body.totp || !authenticator.check(body.totp, user.totpSecret)) {
-        return reply.unauthorized('Valid TOTP code required.');
+      if (!user || !user.isActive) {
+        return fail();
       }
-    }
 
-    failedAttempts.delete(key);
+      const passwordOk = await argon2.verify(user.passwordHash, body.password);
+      if (!passwordOk) {
+        return fail();
+      }
 
-    const payload: AuthedUser = { id: user.id, email: user.email, role: user.role };
-    const accessToken = fastify.jwt.sign(payload, { expiresIn: ACCESS_TOKEN_TTL });
-    const refreshToken = fastify.jwt.sign(payload, { expiresIn: REFRESH_TOKEN_TTL, key: env.JWT_REFRESH_SECRET });
+      if (user.totpSecret) {
+        if (!body.totp || !authenticator.check(body.totp, user.totpSecret)) {
+          return reply.unauthorized('Valid TOTP code required.');
+        }
+      }
 
-    setAuthCookies(reply, accessToken, refreshToken);
-    return { user: payload };
-  });
+      failedAttempts.delete(key);
+
+      const payload: AuthedUser = { id: user.id, email: user.email, role: user.role };
+      const accessToken = fastify.jwt.sign(payload, { expiresIn: ACCESS_TOKEN_TTL });
+      const refreshToken = fastify.jwt.sign(payload, { expiresIn: REFRESH_TOKEN_TTL, key: env.JWT_REFRESH_SECRET });
+
+      setAuthCookies(reply, accessToken, refreshToken);
+      return { user: payload };
+    },
+  );
 
   fastify.post('/auth/refresh', { config: { public: true } }, async (request, reply) => {
     const refreshToken = request.cookies['pt_refresh'];

@@ -63,35 +63,47 @@ npm run dev:web                          # http://localhost:5173
 
 ## Status
 
-**Phases 1 (Foundations) and 2 (Clients & Agents) complete**, verified end-to-end against a
-live Supabase Postgres instance (ap-southeast-2, via the session pooler — the direct
-`db.*.supabase.co` host is IPv6-only and unreachable from IPv4-only networks; use the pooler
-connection string from Project Settings → Database).
+**All 6 build phases (§23) complete** — Foundations, Clients & Agents, Cases, Reports & PDF,
+Email, and Settings & hardening — every piece verified end-to-end against a live Supabase
+Postgres instance (ap-southeast-2, via the session pooler — the direct `db.*.supabase.co` host
+is IPv6-only and unreachable from IPv4-only networks; use the pooler connection string from
+Project Settings → Database) and exercised through a real browser, not just `curl` or code
+review. Remaining spec phases (§23 Phase 7 UAT, Phase 8 go-live) are Nicole/deployment
+activities, not application code.
 
-**Phase 1:** schema, seed (reference data + §2.2 settings — confirmed branding only, no ACN,
-no iTrace anything), auth (Argon2id + JWT, secure-by-default route guard, admin/staff roles),
-app shell, keyboard layer.
+**What's built:** auth (Argon2id + JWT, secure-by-default route guard, admin/staff roles, TOTP
+support, IP + per-account login rate limiting); the real client/agent CSV load (every number in
+§8.5/§8.6 confirmed exactly against 689/35 loaded records); full CRUD for Clients, Agents and
+Cases with Find and the four saved case filters; the complete case business-rules engine
+(package/rate/fee resolution, status side effects) reproducing §6.1-§6.7 exactly; all eleven
+report outputs plus Batch PDF, with letterhead/body text extracted verbatim from the supplied
+sample PDFs where evidence existed; email (report-to-client and agent-instruction, capture
+transport pending a real provider); and the full Settings screen (company, email templates,
+defaults, read-only reference data, user management).
 
-**Phase 2:** the real client/agent CSV load (`scripts/load`) — every number in spec §8.5/§8.6
-confirmed exactly against the loaded data (689/35 records, reference ranges, needs_review
-breakdown, agent skill split, standard-package count); full CRUD API with Find ("begins with
-per word") and the needs-review filter; Clients and Agents list/detail screens with Prev/Next;
-and all six Client/Agent report outputs (Details, List, Envelope × 2) rendered via Playwright,
-letterhead/footer pulled from Settings, verified by generating and visually inspecting real
-PDFs against live data.
+Roughly a dozen real bugs were found and fixed by actually running the app — a CORS `methods`
+gap that silently broke every edit/delete in the browser, a PDF envelope orientation bug, a
+React Query retry-storm that made every delete look like it hung for ~7 seconds, a Settings
+seed that silently never updated an existing row, and others — see the git log for the full
+list; each commit documents what broke and why.
 
-Several real bugs were found and fixed by actually exercising the app end-to-end (browser +
-generated PDFs), not just from code review or `curl`: a CORS `methods` gap that silently broke
-every edit/delete in the browser, an empty-body `Content-Type` header that 400'd every delete,
-a search bug that only matched the start of a field instead of any word in it, and a PDF
-envelope orientation bug where `landscape: true` double-flipped already-landscape explicit
-dimensions into a tall portrait page.
+**Known gaps requiring Nicole's input before go-live (not blocking, all explicitly flagged in
+code):**
+- Report letterhead logo — placeholder box until a URL is supplied (§22)
+- Process Service report template body — no sample existed anywhere in the supplied material
+- Update Report's outro paragraph — genuinely truncated in the supplied sample, rendered
+  exactly as far as confirmed
+- Envelope page size — unverified DL (220mm×110mm) default (D14)
+- §21: ACN/secondary ABN omitted from report footers per your confirmed decision
 
-**Known gaps carried forward:** the report letterhead logo is a placeholder (§22, not yet
-supplied); the envelope page size is an unverified DL default (D14, no sample was supplied to
-check it against).
+**Go-live checklist — deployment/infra, not application code:**
+- [ ] Real transactional email provider + verified sending domain (SPF/DKIM/DMARC) — D6, §14.3
+- [ ] Supabase Storage wired in for emailed-PDF storage, replacing the local-disk dev stand-in
+      (needs a service-role key, not available while building this — see `apps/api/src/storage/storage.ts`)
+- [ ] Automated daily encrypted backups with a **tested** restore (§17) — Supabase-managed
+- [ ] Confirm TLS/HSTS at the hosting layer (Netlify handles this by default)
+- [ ] Confirm encryption at rest (Supabase-managed)
+- [ ] Australian region confirmed for both Postgres and hosting
 
-**Not yet built:** Cases (Phase 3), the five case report outputs and Batch PDF (Phase 4),
-email (Phase 5), Settings UI / hardening (Phase 6).
-
-See `docs/PeopleTrackers_V1_Build_Specification.md` §23 for the full phase plan.
+See `docs/PeopleTrackers_V1_Build_Specification.md` §23 for the full phase plan and §19 for the
+full acceptance criteria checklist.
