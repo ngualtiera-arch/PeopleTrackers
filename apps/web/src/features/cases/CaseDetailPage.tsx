@@ -25,6 +25,20 @@ import { useCase, useCreateCase, useUpdateCase, useDeleteCase, useCopyTemplate }
 // Files list itself, where that set is actually visible; only the single-record report types
 // apply here.
 const DETAIL_REPORT_OPTIONS = CASE_REPORT_OPTIONS.filter((o) => o.scope === 'single');
+
+// Colour-coded status banner — reproduces the source's on-screen "NON LOCATE" red block
+// (confirmed from a live recording of the FileMaker system). Only that one colour was directly
+// observed; the rest of this map is a reasonable extension of the same red/amber/green logic
+// (closed-without-result vs in-progress vs successful), not independently confirmed.
+const STATUS_COLORS: Record<string, string> = {
+  new_instruction: 'bg-slate-100 text-slate-700',
+  leads_obtained: 'bg-amber-100 text-amber-800',
+  non_locate: 'bg-red-100 text-red-700',
+  located: 'bg-green-100 text-green-700',
+  completed: 'bg-green-100 text-green-700',
+  withdrawn: 'bg-slate-200 text-slate-600',
+  credited_disputed: 'bg-red-100 text-red-700',
+};
 const REPORT_ENDPOINT: Record<string, string> = {
   case_report: '',
   update_report: 'update_report',
@@ -245,7 +259,7 @@ export function CaseDetailPage() {
         />
       )}
 
-      <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-6 py-6">
+      <div className="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-6 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-900">{isNew ? 'New File' : `File ${c?.reference}`}</h1>
           {!isNew && (
@@ -259,182 +273,201 @@ export function CaseDetailPage() {
           )}
         </div>
 
-        {/* Header block — §9.4 */}
-        <section className="grid grid-cols-3 gap-4 rounded-lg border border-slate-200 bg-white p-4">
-          <Field label="Client">
-            <TypeaheadPicker value={client} onChange={setClient} search={searchClients} placeholder="Search clients…" />
-            {client && !isNew && (
-              <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/clients/${client.id}`)}>
-                Open client →
-              </button>
-            )}
-          </Field>
-          <Field label="Client Ref."><input className={inputClass} value={form.clientRef ?? ''} onChange={(e) => set('clientRef', e.target.value)} /></Field>
-          <Field label="Type">
-            <select className={inputClass} value={caseTypeCode} onChange={(e) => setCaseTypeCode(e.target.value)}>
-              {CASE_TYPES.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Agent">
-            <TypeaheadPicker value={agent} onChange={setAgent} search={searchAgents} placeholder="Search agents…" />
-            {agent && !isNew && (
-              <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/agents/${agent.id}`)}>
-                Open agent →
-              </button>
-            )}
-          </Field>
-          <Field label="Date Entered">
-            <input className={`${inputClass} bg-slate-50`} value={c?.dateEntered ? new Date(c.dateEntered).toLocaleDateString('en-AU') : '—'} disabled />
-          </Field>
-          <Field label="Date Due"><input type="date" className={inputClass} value={form.dateDue ?? ''} onChange={(e) => set('dateDue', e.target.value)} /></Field>
-          <Field label="Package" hint="Computed from client + type — not directly editable.">
-            <input className={`${inputClass} bg-slate-50`} value={c?.package?.name ?? '—'} disabled />
-          </Field>
-          <Field label="Rate 1 (Locate)"><input type="number" step="0.01" className={inputClass} value={form.rateLocate ?? ''} onChange={(e) => set('rateLocate', e.target.value)} /></Field>
-          <Field label="Rate 2 (Non Locate)"><input type="number" step="0.01" className={inputClass} value={form.rateNonLocate ?? ''} onChange={(e) => set('rateNonLocate', e.target.value)} /></Field>
-          <Field label="Fee"><input type="number" step="0.01" className={inputClass} value={form.fee ?? ''} onChange={(e) => set('fee', e.target.value)} /></Field>
-          <Field label="Units"><input type="number" step="0.01" className={inputClass} value={form.units ?? ''} onChange={(e) => set('units', e.target.value)} /></Field>
-          <Field label="Inv. Amount"><input type="number" step="0.01" className={inputClass} value={form.amount ?? ''} onChange={(e) => set('amount', e.target.value)} /></Field>
-        </section>
+        {/*
+          Landscape layout, matching the source's original single-screen spatial arrangement
+          (confirmed from a recording of the live FileMaker system) rather than our previous
+          stacked single-column screen: header + status share a row, then a two-column body —
+          Subject/Address/Employer/Notes on the left, Confirmed Address + Report on the right —
+          so the whole file fits with far less scrolling, styled with our own visual language.
+        */}
 
-        {/* Status panel — §9.4 */}
-        <section className="flex items-center gap-6 rounded-lg border border-slate-200 bg-white p-4">
-          <Field label="Status">
-            <select className={inputClass} value={statusCode} onChange={(e) => setStatusCode(e.target.value)}>
-              {CASE_STATUSES.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
-            </select>
-          </Field>
-          <label className="flex items-center gap-1.5 text-sm text-slate-600">
-            <input type="checkbox" checked={reportSent} onChange={(e) => setReportSent(e.target.checked)} /> Report Sent
-          </label>
-          <label className="flex items-center gap-1.5 text-sm text-slate-600">
-            <input type="checkbox" checked={invoiced} onChange={(e) => setInvoiced(e.target.checked)} /> Invoiced
-          </label>
-          <div className="text-sm text-slate-500">
-            Date Closed: {c?.dateClosed ? new Date(c.dateClosed).toLocaleDateString('en-AU') : '—'}
-          </div>
-          <span className="ml-auto rounded-full bg-accent-100 px-4 py-1.5 text-sm font-semibold text-accent-700">
-            {statusMeta?.name ?? statusCode}
-          </span>
-        </section>
-
-        {/* Subject Details — §9.4 */}
-        <section className="grid grid-cols-4 gap-4 rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="col-span-4 text-sm font-semibold text-slate-700">Subject Details</h2>
-          <Field label="Title">
-            <select className={inputClass} value={form.subjectTitle ?? ''} onChange={(e) => set('subjectTitle', e.target.value)}>
-              <option value="">—</option>
-              {SUBJECT_TITLES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </Field>
-          <Field label="First Name"><input className={inputClass} value={form.subjectFirstname ?? ''} onChange={(e) => set('subjectFirstname', e.target.value)} /></Field>
-          <Field label="Middle"><input className={inputClass} value={form.subjectMiddlename ?? ''} onChange={(e) => set('subjectMiddlename', e.target.value)} /></Field>
-          <Field label="Last Name"><input className={inputClass} value={form.subjectLastname ?? ''} onChange={(e) => set('subjectLastname', e.target.value)} /></Field>
-          <Field label="DOB"><input type="date" className={inputClass} value={form.subjectDob ?? ''} onChange={(e) => set('subjectDob', e.target.value)} /></Field>
-          <Field label="Gender">
-            <select className={inputClass} value={form.subjectGender ?? ''} onChange={(e) => set('subjectGender', e.target.value)}>
-              <option value="">—</option>
-              {SUBJECT_GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </Field>
-          <Field label="Drivers License"><input className={inputClass} value={form.subjectLicence ?? ''} onChange={(e) => set('subjectLicence', e.target.value)} /></Field>
-          <div />
-          <Field label="Home Phone"><input className={inputClass} value={form.subjectPhHome ?? ''} onChange={(e) => set('subjectPhHome', e.target.value)} /></Field>
-          <Field label="Mobile Phone"><input className={inputClass} value={form.subjectPhMobile ?? ''} onChange={(e) => set('subjectPhMobile', e.target.value)} /></Field>
-          <Field label="Work Phone"><input className={inputClass} value={form.subjectPhWork ?? ''} onChange={(e) => set('subjectPhWork', e.target.value)} /></Field>
-          <Field label="Other Phone"><input className={inputClass} value={form.subjectPhOther ?? ''} onChange={(e) => set('subjectPhOther', e.target.value)} /></Field>
-          <div className="col-span-4">
-            <Field label="Additional Info">
-              <textarea className={`${inputClass} min-h-20`} value={form.additionalInfo ?? ''} onChange={(e) => set('additionalInfo', e.target.value)} />
+        {/* Header + Status — §9.4 */}
+        <section className="grid grid-cols-[1fr_auto] gap-6 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="grid grid-cols-4 gap-4">
+            <Field label="Client">
+              <TypeaheadPicker value={client} onChange={setClient} search={searchClients} placeholder="Search clients…" />
+              {client && !isNew && (
+                <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/clients/${client.id}`)}>
+                  Open client →
+                </button>
+              )}
             </Field>
-          </div>
-        </section>
-
-        {/* Last Known Address — §9.4 */}
-        <section className="grid grid-cols-3 gap-4 rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="col-span-3 text-sm font-semibold text-slate-700">Last Known Address</h2>
-          <Field label="Address 1"><input className={inputClass} value={form.lastKnownAddr1 ?? ''} onChange={(e) => set('lastKnownAddr1', e.target.value)} /></Field>
-          <Field label="Address 2"><input className={inputClass} value={form.lastKnownAddr2 ?? ''} onChange={(e) => set('lastKnownAddr2', e.target.value)} /></Field>
-          <Field label="City"><input className={inputClass} value={form.lastKnownCity ?? ''} onChange={(e) => set('lastKnownCity', e.target.value)} /></Field>
-          <Field label="State">
-            {(form.lastKnownCountry || DEFAULT_COUNTRY) === DEFAULT_COUNTRY ? (
-              <select className={inputClass} value={form.lastKnownState ?? ''} onChange={(e) => set('lastKnownState', e.target.value)}>
-                <option value="">—</option>
-                {AUSTRALIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+            <Field label="Client Ref."><input className={inputClass} value={form.clientRef ?? ''} onChange={(e) => set('clientRef', e.target.value)} /></Field>
+            <Field label="Type">
+              <select className={inputClass} value={caseTypeCode} onChange={(e) => setCaseTypeCode(e.target.value)}>
+                {CASE_TYPES.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
               </select>
-            ) : (
-              <input className={inputClass} value={form.lastKnownState ?? ''} onChange={(e) => set('lastKnownState', e.target.value)} />
-            )}
-          </Field>
-          <Field label="Postcode"><input className={inputClass} value={form.lastKnownPostcode ?? ''} onChange={(e) => set('lastKnownPostcode', e.target.value)} /></Field>
-          <Field label="Country"><input className={inputClass} value={form.lastKnownCountry ?? ''} onChange={(e) => set('lastKnownCountry', e.target.value)} /></Field>
-        </section>
-
-        {/* Employer — §9.4 */}
-        <section className="grid grid-cols-3 gap-4 rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="col-span-3 text-sm font-semibold text-slate-700">Employer</h2>
-          <Field label="Company"><input className={inputClass} value={form.employer ?? ''} onChange={(e) => set('employer', e.target.value)} /></Field>
-          <Field label="Phone"><input className={inputClass} value={form.employerPhone ?? ''} onChange={(e) => set('employerPhone', e.target.value)} /></Field>
-          <Field label="Fax"><input className={inputClass} value={form.employerFax ?? ''} onChange={(e) => set('employerFax', e.target.value)} /></Field>
-          <Field label="Address 1"><input className={inputClass} value={form.employerAddr1 ?? ''} onChange={(e) => set('employerAddr1', e.target.value)} /></Field>
-          <Field label="Address 2"><input className={inputClass} value={form.employerAddr2 ?? ''} onChange={(e) => set('employerAddr2', e.target.value)} /></Field>
-          <Field label="City"><input className={inputClass} value={form.employerCity ?? ''} onChange={(e) => set('employerCity', e.target.value)} /></Field>
-          <Field label="State"><input className={inputClass} value={form.employerState ?? ''} onChange={(e) => set('employerState', e.target.value)} /></Field>
-          <Field label="Postcode"><input className={inputClass} value={form.employerPostcode ?? ''} onChange={(e) => set('employerPostcode', e.target.value)} /></Field>
-          <Field label="Country"><input className={inputClass} value={form.employerCountry ?? ''} onChange={(e) => set('employerCountry', e.target.value)} /></Field>
-        </section>
-
-        {/* Agent Notes — §9.4 */}
-        <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-700">Agent Notes</h2>
-            <button
-              type="button"
-              disabled={isNew || !agent}
-              title={!agent ? 'Assign an agent first' : undefined}
-              className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
-              onClick={() => setEmailInstructionOpen(true)}
-            >
-              Email Instruction
-            </button>
-          </div>
-          <textarea className={`${inputClass} min-h-24`} value={form.agentNotes ?? ''} onChange={(e) => set('agentNotes', e.target.value)} />
-        </section>
-
-        {/* Report panel — §9.4 */}
-        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-700">Confirmed Address</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <Field label="Address 1"><input className={inputClass} value={form.confirmedAddr1 ?? ''} onChange={(e) => set('confirmedAddr1', e.target.value)} /></Field>
-            <Field label="Address 2"><input className={inputClass} value={form.confirmedAddr2 ?? ''} onChange={(e) => set('confirmedAddr2', e.target.value)} /></Field>
-            <Field label="City"><input className={inputClass} value={form.confirmedCity ?? ''} onChange={(e) => set('confirmedCity', e.target.value)} /></Field>
-            <Field label="State"><input className={inputClass} value={form.confirmedState ?? ''} onChange={(e) => set('confirmedState', e.target.value)} /></Field>
-            <Field label="Postcode"><input className={inputClass} value={form.confirmedPostcode ?? ''} onChange={(e) => set('confirmedPostcode', e.target.value)} /></Field>
-            <Field label="Country"><input className={inputClass} value={form.confirmedCountry ?? ''} onChange={(e) => set('confirmedCountry', e.target.value)} /></Field>
+            </Field>
+            <Field label="Agent">
+              <TypeaheadPicker value={agent} onChange={setAgent} search={searchAgents} placeholder="Search agents…" />
+              {agent && !isNew && (
+                <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/agents/${agent.id}`)}>
+                  Open agent →
+                </button>
+              )}
+            </Field>
+            <Field label="Date Entered">
+              <input className={`${inputClass} bg-slate-50`} value={c?.dateEntered ? new Date(c.dateEntered).toLocaleDateString('en-AU') : '—'} disabled />
+            </Field>
+            <Field label="Date Due"><input type="date" className={inputClass} value={form.dateDue ?? ''} onChange={(e) => set('dateDue', e.target.value)} /></Field>
+            <Field label="Package" hint="Computed from client + type — not directly editable.">
+              <input className={`${inputClass} bg-slate-50`} value={c?.package?.name ?? '—'} disabled />
+            </Field>
+            <Field label="Rate 1 (Locate)"><input type="number" step="0.01" className={inputClass} value={form.rateLocate ?? ''} onChange={(e) => set('rateLocate', e.target.value)} /></Field>
+            <Field label="Rate 2 (Non Locate)"><input type="number" step="0.01" className={inputClass} value={form.rateNonLocate ?? ''} onChange={(e) => set('rateNonLocate', e.target.value)} /></Field>
+            <Field label="Fee"><input type="number" step="0.01" className={inputClass} value={form.fee ?? ''} onChange={(e) => set('fee', e.target.value)} /></Field>
+            <Field label="Units"><input type="number" step="0.01" className={inputClass} value={form.units ?? ''} onChange={(e) => set('units', e.target.value)} /></Field>
+            <Field label="Inv. Amount"><input type="number" step="0.01" className={inputClass} value={form.amount ?? ''} onChange={(e) => set('amount', e.target.value)} /></Field>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-            {REPORT_TEMPLATES.map((t) => (
-              <button
-                key={t.code}
-                type="button"
-                disabled={isNew}
-                title={isNew ? 'Save the case first' : undefined}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-                onClick={() => handleCopyTemplate(t.code)}
-              >
-                {t.buttonLabel}
+          <div className="w-64 border-l border-slate-100 pl-5">
+            <div className="mb-2 text-xs font-medium text-slate-500">Status</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+              {CASE_STATUSES.map((s) => (
+                <label key={s.code} className="flex items-center gap-1.5 text-sm text-slate-700">
+                  <input type="radio" name="status" checked={statusCode === s.code} onChange={() => setStatusCode(s.code)} />
+                  {s.name}
+                </label>
+              ))}
+            </div>
+            <div className="mt-3 flex gap-4">
+              <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                <input type="checkbox" checked={reportSent} onChange={(e) => setReportSent(e.target.checked)} /> Report Sent
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                <input type="checkbox" checked={invoiced} onChange={(e) => setInvoiced(e.target.checked)} /> Invoiced
+              </label>
+            </div>
+            <div className={`mt-3 rounded-md px-3 py-2 text-center text-sm font-bold ${STATUS_COLORS[statusCode] ?? 'bg-accent-100 text-accent-700'}`}>
+              {statusMeta?.name ?? statusCode}
+            </div>
+            <div className="mt-2 text-xs text-slate-500">
+              Date Closed: {c?.dateClosed ? new Date(c.dateClosed).toLocaleDateString('en-AU') : '—'}
+            </div>
+          </div>
+        </section>
+
+        {/* Two-column body — §9.4 */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
+            {/* Subject Details */}
+            <section className="grid grid-cols-3 gap-4 rounded-lg border border-slate-200 bg-white p-4">
+              <h2 className="col-span-3 text-sm font-semibold text-slate-700">Subject Details</h2>
+              <Field label="Title">
+                <select className={inputClass} value={form.subjectTitle ?? ''} onChange={(e) => set('subjectTitle', e.target.value)}>
+                  <option value="">—</option>
+                  {SUBJECT_TITLES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="First Name"><input className={inputClass} value={form.subjectFirstname ?? ''} onChange={(e) => set('subjectFirstname', e.target.value)} /></Field>
+              <Field label="Middle"><input className={inputClass} value={form.subjectMiddlename ?? ''} onChange={(e) => set('subjectMiddlename', e.target.value)} /></Field>
+              <Field label="Last Name"><input className={inputClass} value={form.subjectLastname ?? ''} onChange={(e) => set('subjectLastname', e.target.value)} /></Field>
+              <Field label="DOB"><input type="date" className={inputClass} value={form.subjectDob ?? ''} onChange={(e) => set('subjectDob', e.target.value)} /></Field>
+              <Field label="Gender">
+                <select className={inputClass} value={form.subjectGender ?? ''} onChange={(e) => set('subjectGender', e.target.value)}>
+                  <option value="">—</option>
+                  {SUBJECT_GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </Field>
+              <Field label="Drivers License"><input className={inputClass} value={form.subjectLicence ?? ''} onChange={(e) => set('subjectLicence', e.target.value)} /></Field>
+              <Field label="Home Phone"><input className={inputClass} value={form.subjectPhHome ?? ''} onChange={(e) => set('subjectPhHome', e.target.value)} /></Field>
+              <Field label="Mobile Phone"><input className={inputClass} value={form.subjectPhMobile ?? ''} onChange={(e) => set('subjectPhMobile', e.target.value)} /></Field>
+              <Field label="Work Phone"><input className={inputClass} value={form.subjectPhWork ?? ''} onChange={(e) => set('subjectPhWork', e.target.value)} /></Field>
+              <Field label="Other Phone"><input className={inputClass} value={form.subjectPhOther ?? ''} onChange={(e) => set('subjectPhOther', e.target.value)} /></Field>
+              <div className="col-span-3">
+                <Field label="Additional Info">
+                  <textarea className={`${inputClass} min-h-16`} value={form.additionalInfo ?? ''} onChange={(e) => set('additionalInfo', e.target.value)} />
+                </Field>
+              </div>
+            </section>
+
+            {/* Last Known Address */}
+            <section className="grid grid-cols-3 gap-4 rounded-lg border border-slate-200 bg-white p-4">
+              <h2 className="col-span-3 text-sm font-semibold text-slate-700">Last Known Address</h2>
+              <Field label="Address 1"><input className={inputClass} value={form.lastKnownAddr1 ?? ''} onChange={(e) => set('lastKnownAddr1', e.target.value)} /></Field>
+              <Field label="Address 2"><input className={inputClass} value={form.lastKnownAddr2 ?? ''} onChange={(e) => set('lastKnownAddr2', e.target.value)} /></Field>
+              <Field label="City"><input className={inputClass} value={form.lastKnownCity ?? ''} onChange={(e) => set('lastKnownCity', e.target.value)} /></Field>
+              <Field label="State">
+                {(form.lastKnownCountry || DEFAULT_COUNTRY) === DEFAULT_COUNTRY ? (
+                  <select className={inputClass} value={form.lastKnownState ?? ''} onChange={(e) => set('lastKnownState', e.target.value)}>
+                    <option value="">—</option>
+                    {AUSTRALIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <input className={inputClass} value={form.lastKnownState ?? ''} onChange={(e) => set('lastKnownState', e.target.value)} />
+                )}
+              </Field>
+              <Field label="Postcode"><input className={inputClass} value={form.lastKnownPostcode ?? ''} onChange={(e) => set('lastKnownPostcode', e.target.value)} /></Field>
+              <Field label="Country"><input className={inputClass} value={form.lastKnownCountry ?? ''} onChange={(e) => set('lastKnownCountry', e.target.value)} /></Field>
+            </section>
+
+            {/* Employer */}
+            <section className="grid grid-cols-3 gap-4 rounded-lg border border-slate-200 bg-white p-4">
+              <h2 className="col-span-3 text-sm font-semibold text-slate-700">Employer</h2>
+              <Field label="Company"><input className={inputClass} value={form.employer ?? ''} onChange={(e) => set('employer', e.target.value)} /></Field>
+              <Field label="Phone"><input className={inputClass} value={form.employerPhone ?? ''} onChange={(e) => set('employerPhone', e.target.value)} /></Field>
+              <Field label="Fax"><input className={inputClass} value={form.employerFax ?? ''} onChange={(e) => set('employerFax', e.target.value)} /></Field>
+              <Field label="Address 1"><input className={inputClass} value={form.employerAddr1 ?? ''} onChange={(e) => set('employerAddr1', e.target.value)} /></Field>
+              <Field label="Address 2"><input className={inputClass} value={form.employerAddr2 ?? ''} onChange={(e) => set('employerAddr2', e.target.value)} /></Field>
+              <Field label="City"><input className={inputClass} value={form.employerCity ?? ''} onChange={(e) => set('employerCity', e.target.value)} /></Field>
+              <Field label="State"><input className={inputClass} value={form.employerState ?? ''} onChange={(e) => set('employerState', e.target.value)} /></Field>
+              <Field label="Postcode"><input className={inputClass} value={form.employerPostcode ?? ''} onChange={(e) => set('employerPostcode', e.target.value)} /></Field>
+              <Field label="Country"><input className={inputClass} value={form.employerCountry ?? ''} onChange={(e) => set('employerCountry', e.target.value)} /></Field>
+            </section>
+
+            {/* Agent Notes */}
+            <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-700">Agent Notes</h2>
+                <button
+                  type="button"
+                  disabled={isNew || !agent}
+                  title={!agent ? 'Assign an agent first' : undefined}
+                  className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-transparent"
+                  onClick={() => setEmailInstructionOpen(true)}
+                >
+                  Email Instruction
+                </button>
+              </div>
+              <textarea className={`${inputClass} min-h-24`} value={form.agentNotes ?? ''} onChange={(e) => set('agentNotes', e.target.value)} />
+            </section>
+          </div>
+
+          {/* Confirmed Address + Report */}
+          <section className="space-y-3 self-start rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="text-sm font-semibold text-slate-700">Confirmed Address</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Address 1"><input className={inputClass} value={form.confirmedAddr1 ?? ''} onChange={(e) => set('confirmedAddr1', e.target.value)} /></Field>
+              <Field label="Address 2"><input className={inputClass} value={form.confirmedAddr2 ?? ''} onChange={(e) => set('confirmedAddr2', e.target.value)} /></Field>
+              <Field label="City"><input className={inputClass} value={form.confirmedCity ?? ''} onChange={(e) => set('confirmedCity', e.target.value)} /></Field>
+              <Field label="State"><input className={inputClass} value={form.confirmedState ?? ''} onChange={(e) => set('confirmedState', e.target.value)} /></Field>
+              <Field label="Postcode"><input className={inputClass} value={form.confirmedPostcode ?? ''} onChange={(e) => set('confirmedPostcode', e.target.value)} /></Field>
+              <Field label="Country"><input className={inputClass} value={form.confirmedCountry ?? ''} onChange={(e) => set('confirmedCountry', e.target.value)} /></Field>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+              {REPORT_TEMPLATES.map((t) => (
+                <button
+                  key={t.code}
+                  type="button"
+                  disabled={isNew}
+                  title={isNew ? 'Save the case first' : undefined}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                  onClick={() => handleCopyTemplate(t.code)}
+                >
+                  {t.buttonLabel}
+                </button>
+              ))}
+              <button type="button" className="ml-auto text-xs text-accent-600 hover:underline" onClick={() => navigate('/templates')}>
+                Edit Templates
               </button>
-            ))}
-            <button type="button" className="ml-auto text-xs text-accent-600 hover:underline" onClick={() => navigate('/templates')}>
-              Edit Templates
-            </button>
-          </div>
+            </div>
 
-          <Field label="Report">
-            <textarea className={`${inputClass} min-h-48 font-mono`} value={form.report ?? ''} onChange={(e) => set('report', e.target.value)} />
-          </Field>
-        </section>
+            <Field label="Report">
+              <textarea className={`${inputClass} min-h-[28rem] font-mono`} value={form.report ?? ''} onChange={(e) => set('report', e.target.value)} />
+            </Field>
+          </section>
+        </div>
 
         <div className="flex justify-end gap-2">
           <button className="rounded-md border border-slate-300 px-4 py-2 text-sm" onClick={() => navigate('/files')}>

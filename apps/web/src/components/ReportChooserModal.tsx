@@ -12,12 +12,14 @@ export function ReportChooserModal({
   options,
   defaultCode,
   onChoose,
+  onExportCsv,
   onClose,
 }: {
   title: string;
   options: ReportChooserOption[];
   defaultCode: string;
   onChoose: (code: string) => void;
+  onExportCsv?: (code: string) => void;
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState(defaultCode);
@@ -38,6 +40,14 @@ export function ReportChooserModal({
           <button className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" onClick={onClose}>
             Cancel
           </button>
+          {onExportCsv && (
+            <button
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              onClick={() => onExportCsv(selected)}
+            >
+              Save as CSV
+            </button>
+          )}
           <button
             className="rounded-md bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-700"
             onClick={() => onChoose(selected)}

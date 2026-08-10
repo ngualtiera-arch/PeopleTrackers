@@ -17,6 +17,7 @@ import { updateReportTemplate } from '../reports/templates/updateReport.js';
 import { agentInstructionTemplate } from '../reports/templates/agentInstruction.js';
 import { clientStatusReportTemplate } from '../reports/templates/clientStatusReport.js';
 import { fileListByAgentTemplate } from '../reports/templates/fileListByAgent.js';
+import { toCsv } from '../lib/csv.js';
 
 const CLIENT_SEARCH_FIELDS = ['company', 'contactName', 'kind', 'email', 'phone', 'city', 'state'];
 const AGENT_SEARCH_FIELDS = ['name', 'company', 'email', 'phone', 'city', 'state'];
@@ -25,6 +26,16 @@ function sendPdf(reply: import('fastify').FastifyReply, pdf: Buffer, filename: s
   reply.header('Content-Type', 'application/pdf');
   reply.header('Content-Disposition', `inline; filename="${filename}"`);
   return reply.send(pdf);
+}
+
+function sendCsv(reply: import('fastify').FastifyReply, csv: string, filename: string) {
+  reply.header('Content-Type', 'text/csv; charset=utf-8');
+  reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+  return reply.send(csv);
+}
+
+function subjectFullName(c: { subjectFirstname: string | null; subjectMiddlename: string | null; subjectLastname: string | null }): string {
+  return [c.subjectFirstname, c.subjectMiddlename, c.subjectLastname].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 }
 
 const reportsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -140,7 +151,10 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Client Status Report / File List by Agent — result-set scope (§13.2 #4, #5).
-  fastify.get<{ Querystring: { filter?: string; search?: string } }>('/cases/report/client-status', async (request, reply) => {
+  // `format=csv` (raw export, matching the source's "Save as Excel" print-preview option —
+  // confirmed from a recording of the live FileMaker system) returns the same rows as CSV
+  // instead of PDF.
+  fastify.get<{ Querystring: { filter?: string; search?: string; format?: string } }>('/cases/report/client-status', async (request, reply) => {
     const cases = await prisma.case.findMany({
       where: {
         ...caseFilterWhere(request.query.filter ?? 'all'),
@@ -149,11 +163,28 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       include: CASE_INCLUDE,
       orderBy: [{ status: { sortOrder: 'asc' } }, { dateEntered: 'asc' }], // §13.3: sorted by Status, then Date Entered
     });
+
+    if (request.query.format === 'csv') {
+      const csv = toCsv(
+        ['Date Entered', 'Client', 'Client Ref.', 'Subject', 'Type', 'Date Closed', 'Our Ref.'],
+        cases.map((c) => [
+          c.dateEntered ? new Date(c.dateEntered).toLocaleDateString('en-AU') : '',
+          c.client.company,
+          c.clientRef,
+          subjectFullName(c).toUpperCase(),
+          c.caseType.name,
+          c.dateClosed ? new Date(c.dateClosed).toLocaleDateString('en-AU') : '',
+          c.reference,
+        ]),
+      );
+      return sendCsv(reply, csv, 'Client_Status_Report.csv');
+    }
+
     const pdf = await renderPdf(clientStatusReportTemplate(cases));
     return sendPdf(reply, pdf, 'Client_Status_Report.pdf');
   });
 
-  fastify.get<{ Querystring: { filter?: string; search?: string } }>('/cases/report/file-list-by-agent', async (request, reply) => {
+  fastify.get<{ Querystring: { filter?: string; search?: string; format?: string } }>('/cases/report/file-list-by-agent', async (request, reply) => {
     const cases = await prisma.case.findMany({
       where: {
         ...caseFilterWhere(request.query.filter ?? 'all'),
@@ -163,6 +194,24 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       // §13.3: sorted by Agent, then Status, then Date Entered.
       orderBy: [{ agent: { name: 'asc' } }, { status: { sortOrder: 'asc' } }, { dateEntered: 'asc' }],
     });
+
+    if (request.query.format === 'csv') {
+      const csv = toCsv(
+        ['ID', 'Client', 'Client Ref.', 'Subject', 'Package', 'Agent', 'Status', 'Due'],
+        cases.map((c) => [
+          c.reference,
+          c.client.company,
+          c.clientRef,
+          subjectFullName(c).toUpperCase(),
+          c.package?.name ?? '',
+          c.agent?.name ?? '',
+          c.status.name,
+          c.dateDue ? new Date(c.dateDue).toLocaleDateString('en-AU') : '',
+        ]),
+      );
+      return sendCsv(reply, csv, 'File_List.csv');
+    }
+
     const pdf = await renderPdf(fileListByAgentTemplate(cases));
     return sendPdf(reply, pdf, 'File_List.pdf');
   });

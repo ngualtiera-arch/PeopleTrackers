@@ -62,11 +62,23 @@ export function FilesListPage() {
     setSort((s) => (s === key ? (`-${key}` as CaseListParams['sort']) : key));
   }
 
-  function printResultSetReport(code: string) {
-    const params = new URLSearchParams();
+  function resultSetParams(extra?: Record<string, string>) {
+    const params = new URLSearchParams(extra);
     if (search) params.set('search', search);
     if (filter && filter !== 'all') params.set('filter', filter);
-    const qs = params.toString();
+    return params.toString();
+  }
+
+  function printResultSetReport(code: string) {
+    const qs = resultSetParams();
+    window.open(`${API_BASE}/cases/report/${REPORT_ENDPOINT[code]}${qs ? `?${qs}` : ''}`, '_blank');
+    setPrintChooserOpen(false);
+  }
+
+  // "Save as Excel" in the source's print preview (§ confirmed from a live-system recording) —
+  // a raw CSV export of the same result-set report, alongside the PDF.
+  function exportResultSetCsv(code: string) {
+    const qs = resultSetParams({ format: 'csv' });
     window.open(`${API_BASE}/cases/report/${REPORT_ENDPOINT[code]}${qs ? `?${qs}` : ''}`, '_blank');
     setPrintChooserOpen(false);
   }
@@ -124,6 +136,7 @@ export function FilesListPage() {
           defaultCode={defaultReportChoice('list')}
           onClose={() => setPrintChooserOpen(false)}
           onChoose={printResultSetReport}
+          onExportCsv={exportResultSetCsv}
         />
       )}
 
