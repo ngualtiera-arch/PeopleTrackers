@@ -73,6 +73,11 @@ export function TypeaheadPicker({
             <li
               key={opt.id}
               className="cursor-pointer px-3 py-1.5 text-sm hover:bg-accent-50"
+              // Block the browser's default mousedown focus-shift — without this, some
+              // browsers briefly return focus to the input on click, which re-triggers
+              // onFocus below and resets `query`, flashing the input blank until the next
+              // field is clicked and the dropdown properly closes.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onChange(opt);
                 setOpen(false);
