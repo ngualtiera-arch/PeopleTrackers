@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CASE_SAVED_FILTERS, CASE_REPORT_OPTIONS, defaultReportChoice } from '@peopletrackers/shared';
 import { ActionBar } from '../../components/ActionBar';
 import { ReportChooserModal } from '../../components/ReportChooserModal';
@@ -23,6 +23,7 @@ const REPORT_ENDPOINT: Record<string, string> = {
 
 export function FilesListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   // §12.2: the list opens on New Instruction — reproduced here as the screen's own initial
   // state so it holds regardless of how the screen was reached, matching the source's startup
@@ -36,6 +37,18 @@ export function FilesListPage() {
   const { data, isLoading } = useCasesList({ search: search || undefined, filter, sort, page });
 
   useKeyboardShortcuts([{ key: 'Escape', handler: () => navigate('/') }]);
+
+  // Cmd+F landing here (see ActionBar) — clear back to a blank find, same as the source.
+  useEffect(() => {
+    if (!searchParams.has('reset')) return;
+    setSearch('');
+    setFilter('all');
+    setSort(undefined);
+    setPage(1);
+    setSearchParams({}, { replace: true });
+    document.getElementById('case-search')?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const items = data?.items ?? [];
   const orderedIds = items.map((c) => c.id);

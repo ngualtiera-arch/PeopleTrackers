@@ -24,12 +24,15 @@ export function useKeyboardShortcuts(bindings: ShortcutBinding[], options: { ign
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (ignoreWhileTyping && isTypingInField(e.target) && e.key !== 'Escape') {
+      const metaPressed = e.metaKey || e.ctrlKey;
+      // A bare "f" while typing is just the letter f — ignore it. Cmd/Ctrl+F is never a
+      // character the user is trying to type, so it should fire regardless of focus (matches
+      // the source's Cmd+F habit, usable even mid-search).
+      if (ignoreWhileTyping && !metaPressed && isTypingInField(e.target) && e.key !== 'Escape') {
         return;
       }
 
       for (const binding of bindings) {
-        const metaPressed = e.metaKey || e.ctrlKey;
         if (binding.meta && !metaPressed) continue;
         if (!binding.meta && metaPressed) continue;
         if (e.key.toLowerCase() !== binding.key.toLowerCase()) continue;

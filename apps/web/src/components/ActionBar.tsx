@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 /**
  * Reproduces the action bar shared by the Files/Clients/Agents list and detail screens —
@@ -28,6 +29,11 @@ export function ActionBar({
   deleteDisabled?: boolean;
 }) {
   const navigate = useNavigate();
+
+  // Cmd/Ctrl+F, everywhere — reproduces the source's most habitual shortcut: "go back to the
+  // Files screen with a clean, blank find" (§11). Fires from any screen the ActionBar renders
+  // on, not just the Files list, and works even mid-typing (see useKeyboardShortcuts).
+  useKeyboardShortcuts([{ key: 'f', meta: true, handler: () => navigate(`/files?reset=${Date.now()}`) }]);
 
   const buttonClass =
     'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white';
