@@ -5,13 +5,13 @@
   "type": "module",
   "main": "src/client.ts",
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx --env-file=.env prisma/seed.ts"
   },
   "scripts": {
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts",
+    "seed": "tsx --env-file=.env prisma/seed.ts",
     "studio": "prisma studio"
   },
   "dependencies": {
