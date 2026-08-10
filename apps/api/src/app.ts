@@ -15,6 +15,7 @@ import reportsRoutes from './routes/reports.routes.js';
 import casesRoutes from './routes/cases.routes.js';
 import templatesRoutes from './routes/templates.routes.js';
 import emailRoutes from './routes/email.routes.js';
+import usersRoutes from './routes/users.routes.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -39,6 +40,7 @@ export async function buildApp() {
   await app.register(casesRoutes);
   await app.register(templatesRoutes);
   await app.register(emailRoutes);
+  await app.register(usersRoutes);
 
   return app;
 }
