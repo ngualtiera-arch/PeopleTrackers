@@ -98,10 +98,10 @@ code):**
 
 **Go-live checklist — deployment/infra, not application code:**
 - [ ] Real transactional email provider + verified sending domain (SPF/DKIM/DMARC) — D6, §14.3
-- [ ] Supabase Storage — code is ready (`apps/api/src/storage/supabaseStorage.ts`), just needs
-      `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env` (Project Settings → API
-      Keys → `service_role`) and the `case-reports` bucket created (private) in the Supabase
-      dashboard's Storage section. Falls back to local disk automatically until both are set.
+- [x] Supabase Storage — wired up and verified: emailed a real report, confirmed the PDF landed
+      in the private `case-reports` bucket (not local disk). Still needed before *production*
+      go-live: rotate the service-role key if it's ever been shared outside this Mac's local
+      `.env` (it grants full storage access), since it was pasted directly into this session.
 - [ ] Automated daily encrypted backups with a **tested** restore (§17) — Supabase-managed
 - [ ] Confirm TLS/HSTS at the hosting layer (Netlify handles this by default)
 - [ ] Confirm encryption at rest (Supabase-managed)
