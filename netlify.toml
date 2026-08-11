@@ -1,0 +1,10 @@
+[build]
+  command = "npm install && npm run build -w apps/web"
+  publish = "apps/web/dist"
+
+# React Router (client-side routing) — every path must resolve to index.html and let the
+# router decide, or a hard refresh on e.g. /files/123 404s at the CDN before React ever runs.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
