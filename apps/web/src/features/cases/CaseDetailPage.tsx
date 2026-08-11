@@ -17,8 +17,9 @@ import { ActionBar } from '../../components/ActionBar';
 import { ReportChooserModal } from '../../components/ReportChooserModal';
 import { EmailComposeModal, type EmailDefaults } from '../../components/EmailComposeModal';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
-import { apiFetch, API_BASE } from '../../lib/api-client';
+import { apiFetch, ApiError, API_BASE } from '../../lib/api-client';
 import { TypeaheadPicker, type TypeaheadOption } from '../../components/TypeaheadPicker';
+import { useAuth } from '../../lib/auth';
 import { useCase, useCreateCase, useUpdateCase, useDeleteCase, useCopyTemplate } from './api';
 
 // §13.4 chooser: from the case detail screen, scope is fixed to "Current Record" — switching
@@ -98,6 +99,7 @@ export function CaseDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { orderedIds?: string[] } | null;
+  const { user } = useAuth();
 
   const { data: c, isLoading } = useCase(isNew ? undefined : id);
   const createMutation = useCreateCase();
@@ -209,9 +211,22 @@ export function CaseDetailPage() {
     if (!id || isNew) return;
     if (!window.confirm(`Delete case ${c?.reference}? This cannot be undone.`)) return;
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync({ id });
       navigate('/files');
     } catch (err) {
+      const isEmailHistoryConflict = err instanceof ApiError && err.status === 409;
+      if (isEmailHistoryConflict && user?.role === 'admin') {
+        const message = err instanceof Error ? err.message : 'This case has an emailed report on file.';
+        if (window.confirm(`${message}\n\nAs an admin, you can delete it anyway — this also permanently removes the email record. Continue?`)) {
+          try {
+            await deleteMutation.mutateAsync({ id, force: true });
+            navigate('/files');
+          } catch (forceErr) {
+            window.alert(forceErr instanceof Error ? forceErr.message : 'Delete failed.');
+          }
+        }
+        return;
+      }
       window.alert(err instanceof Error ? err.message : 'Delete failed.');
     }
   }

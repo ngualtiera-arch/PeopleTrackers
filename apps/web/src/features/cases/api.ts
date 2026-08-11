@@ -56,7 +56,8 @@ export function useUpdateCase(id: string) {
 export function useDeleteCase() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiFetch<void>(`/cases/${id}`, { method: 'DELETE' }),
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
+      apiFetch<void>(`/cases/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cases'] }),
   });
 }

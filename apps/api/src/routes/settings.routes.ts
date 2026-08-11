@@ -72,18 +72,52 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     return { packages, caseTypes, caseStatuses };
   });
 
-  // Current value of each reference sequence (§9.10, §8.6) — read-only display.
+  const SEQUENCE_INFO: Record<string, { sequence: string; table: string; column: string }> = {
+    case: { sequence: 'cases_reference_seq', table: 'cases', column: 'reference' },
+    client: { sequence: 'clients_reference_seq', table: 'clients', column: 'reference' },
+    agent: { sequence: 'agents_reference_seq', table: 'agents', column: 'reference' },
+  };
+
+  async function nextSequenceValue(sequence: string): Promise<number> {
+    // last_value alone is ambiguous — after a fresh RESTART WITH, is_called is false and
+    // last_value already IS the next value to be handed out; after any real nextval() call,
+    // is_called is true and the next value is last_value + 1.
+    const [row] = await prisma.$queryRawUnsafe<{ last_value: bigint; is_called: boolean }[]>(
+      `select last_value, is_called from ${sequence}`,
+    );
+    return row.is_called ? Number(row.last_value) + 1 : Number(row.last_value);
+  }
+
+  // Current "next" value of each reference sequence (§9.10, §8.6) — read-only display.
   fastify.get('/settings/sequences', { preHandler: fastify.requireRole('admin') }, async () => {
-    const [cases, clients, agents] = await Promise.all([
-      prisma.$queryRawUnsafe<{ last_value: bigint }[]>('select last_value from cases_reference_seq'),
-      prisma.$queryRawUnsafe<{ last_value: bigint }[]>('select last_value from clients_reference_seq'),
-      prisma.$queryRawUnsafe<{ last_value: bigint }[]>('select last_value from agents_reference_seq'),
+    const [caseReference, clientReference, agentReference] = await Promise.all([
+      nextSequenceValue('cases_reference_seq'),
+      nextSequenceValue('clients_reference_seq'),
+      nextSequenceValue('agents_reference_seq'),
     ]);
-    return {
-      caseReference: Number(cases[0].last_value),
-      clientReference: Number(clients[0].last_value),
-      agentReference: Number(agents[0].last_value),
-    };
+    return { caseReference, clientReference, agentReference };
+  });
+
+  const setSequenceSchema = z.object({ nextValue: z.number().int().positive() });
+
+  // Admin override — e.g. migrating go-live to continue exactly where the old FileMaker system
+  // left off, not wherever this build happened to seed to. Guarded against setting a value that
+  // would collide with a reference number already in use.
+  fastify.put<{ Params: { type: string } }>('/settings/sequences/:type', { preHandler: fastify.requireRole('admin') }, async (request, reply) => {
+    const info = SEQUENCE_INFO[request.params.type];
+    if (!info) return reply.notFound('Unknown sequence type.');
+
+    const { nextValue } = setSequenceSchema.parse(request.body);
+
+    const [{ max }] = await prisma.$queryRawUnsafe<{ max: number | null }[]>(
+      `select max(${info.column}) as max from ${info.table}`,
+    );
+    if (max !== null && nextValue <= max) {
+      return reply.badRequest(`That would collide with an existing reference (${max} is already in use). Choose a value greater than ${max}.`);
+    }
+
+    await prisma.$executeRawUnsafe(`alter sequence ${info.sequence} restart with ${nextValue}`);
+    return { nextValue };
   });
 };
 

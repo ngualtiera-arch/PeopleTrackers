@@ -83,6 +83,15 @@ export function useSequences() {
   return useQuery({ queryKey: ['settings', 'sequences'], queryFn: () => apiFetch<Sequences>('/settings/sequences') });
 }
 
+export function useSetSequence(type: 'case' | 'client' | 'agent') {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (nextValue: number) =>
+      apiFetch<{ nextValue: number }>(`/settings/sequences/${type}`, { method: 'PUT', body: JSON.stringify({ nextValue }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings', 'sequences'] }),
+  });
+}
+
 export function useUsers() {
   return useQuery({ queryKey: ['users'], queryFn: () => apiFetch<AppUser[]>('/users') });
 }

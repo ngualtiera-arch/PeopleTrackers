@@ -125,15 +125,31 @@ const casesRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.delete<{ Params: { id: string } }>('/cases/:id', async (request, reply) => {
+  fastify.delete<{ Params: { id: string }; Querystring: { force?: string } }>('/cases/:id', async (request, reply) => {
+    const force = request.query.force === 'true';
+
     try {
-      await prisma.case.delete({ where: { id: request.params.id } });
+      if (force) {
+        // Admin-only override — deletes the email/document audit trail along with the case
+        // itself. The restriction below is a safety net against accidental deletion, not an
+        // absolute wall; an admin who genuinely means to remove a case gets to.
+        if (request.authUser?.role !== 'admin') {
+          return reply.forbidden('Only an admin can force-delete a case with an emailed-report history.');
+        }
+        await prisma.$transaction([
+          prisma.emailLog.deleteMany({ where: { caseId: request.params.id } }),
+          prisma.generatedDocument.deleteMany({ where: { caseId: request.params.id } }),
+          prisma.case.delete({ where: { id: request.params.id } }),
+        ]);
+      } else {
+        await prisma.case.delete({ where: { id: request.params.id } });
+      }
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
         return reply.notFound('Case not found.');
       }
       // generated_documents.caseId is ON DELETE RESTRICT (schema.prisma) — a case with an
-      // emailed-report history can't be deleted, same protection as client/agent delete.
+      // emailed-report history can't be deleted without ?force=true (admin-only, above).
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
         return reply.conflict('This case has an emailed report on file and cannot be deleted.');
       }

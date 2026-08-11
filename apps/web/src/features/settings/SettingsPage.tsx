@@ -8,6 +8,7 @@ import {
   useUpdateSetting,
   useReferenceData,
   useSequences,
+  useSetSequence,
   useUsers,
   useCreateUser,
   useUpdateUser,
@@ -142,6 +143,59 @@ function DefaultsSection({ initial }: { initial: DefaultsSettings }) {
   );
 }
 
+function SequenceField({ label, type, value }: { label: string; type: 'case' | 'client' | 'agent'; value: number }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  const mutation = useSetSequence(type);
+
+  useEffect(() => setDraft(String(value)), [value]);
+
+  if (!editing) {
+    return (
+      <div>
+        <span className="text-xs text-slate-500">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{value}</span>
+          <button className="text-xs text-accent-600 hover:underline" onClick={() => setEditing(true)}>
+            Change
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <span className="text-xs text-slate-500">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button
+          className="rounded-md bg-accent-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+          disabled={mutation.isPending}
+          onClick={async () => {
+            try {
+              await mutation.mutateAsync(Number(draft));
+              setEditing(false);
+            } catch (err) {
+              window.alert(err instanceof Error ? err.message : 'Could not update.');
+            }
+          }}
+        >
+          Save
+        </button>
+        <button className="rounded-md border border-slate-300 px-2 py-1 text-xs" onClick={() => setEditing(false)}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReferenceDataSection() {
   const { data } = useReferenceData();
   const { data: sequences } = useSequences();
@@ -149,13 +203,13 @@ function ReferenceDataSection() {
   return (
     <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-700">Reference Data</h2>
-      <p className="text-xs text-slate-400">Read-only in V1 (§7) — rates/statuses don't change without a developer, same as the source.</p>
+      <p className="text-xs text-slate-400">Packages/case types/statuses are read-only in V1 (§7) — same as the source. Reference sequences below are admin-editable, e.g. to continue exactly where the old system left off at go-live.</p>
 
       {sequences && (
         <div className="grid grid-cols-3 gap-4 border-b border-slate-100 pb-4 text-sm">
-          <div><span className="text-xs text-slate-500">Next Case Ref.</span><div className="font-medium">{sequences.caseReference}</div></div>
-          <div><span className="text-xs text-slate-500">Next Client Ref.</span><div className="font-medium">{sequences.clientReference}</div></div>
-          <div><span className="text-xs text-slate-500">Next Agent Ref.</span><div className="font-medium">{sequences.agentReference}</div></div>
+          <SequenceField label="Next Case Ref." type="case" value={sequences.caseReference} />
+          <SequenceField label="Next Client Ref." type="client" value={sequences.clientReference} />
+          <SequenceField label="Next Agent Ref." type="agent" value={sequences.agentReference} />
         </div>
       )}
 
