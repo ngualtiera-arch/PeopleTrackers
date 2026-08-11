@@ -16,7 +16,7 @@
     "load:clients-agents": "npm run start -w scripts/load"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "allowScripts": {
     "@prisma/client@5.22.0": true,
