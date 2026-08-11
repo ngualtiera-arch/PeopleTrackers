@@ -26,7 +26,14 @@ function setAuthCookies(reply: import('fastify').FastifyReply, accessToken: stri
   const cookieOpts = {
     httpOnly: true,
     secure: env.COOKIE_SECURE,
-    sameSite: 'lax' as const,
+    // The web app (Netlify) and API (Railway) live on genuinely different domains in
+    // production — a real cross-site setup, not just cross-port like local dev. SameSite=Lax
+    // blocks the cookie on fetch/XHR entirely for cross-site requests (it only allows top-level
+    // navigations), so login would appear to succeed but every subsequent API call came back
+    // unauthenticated. SameSite=None requires Secure=true, which COOKIE_SECURE already tracks —
+    // in local dev (COOKIE_SECURE=false, same-site localhost) Lax is correct and required, since
+    // browsers reject None without Secure.
+    sameSite: (env.COOKIE_SECURE ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
   };
   reply.setCookie('pt_access', accessToken, { ...cookieOpts, maxAge: 15 * 60 });
