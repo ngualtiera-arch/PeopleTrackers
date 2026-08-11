@@ -23,8 +23,9 @@ export async function buildApp() {
   const app = Fastify({ logger: true });
 
   await app.register(errorHandlerPlugin);
+  const allowedOrigins = env.WEB_ORIGIN.split(',').map((o) => o.trim());
   await app.register(cors, {
-    origin: env.WEB_ORIGIN,
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
