@@ -61,7 +61,7 @@ const EMPLOYER_KEYS = ['employer', 'employerAddr1', 'employerAddr2', 'employerCi
 const NUMERIC_KEYS = ['rateLocate', 'rateNonLocate', 'fee', 'units', 'amount'] as const;
 
 const FIELD_KEYS = [
-  'clientRef', 'dateDue',
+  'clientRef', 'dateDue', 'dateClosed',
   ...SUBJECT_FIELD_KEYS, ...CONFIRMED_KEYS, ...LAST_KNOWN_KEYS, ...EMPLOYER_KEYS,
   'additionalInfo', 'agentNotes', 'report',
   ...NUMERIC_KEYS,
@@ -128,6 +128,7 @@ export function CaseDetailPage() {
       }
       if (c.dateDue) next.dateDue = c.dateDue.slice(0, 10);
       if (c.subjectDob) next.subjectDob = c.subjectDob.slice(0, 10);
+      if (c.dateClosed) next.dateClosed = c.dateClosed.slice(0, 10);
       setForm(next);
       setClient({ id: c.client.id, label: c.client.company ?? c.client.contactName ?? `#${c.client.reference}` });
       setAgent(c.agent ? { id: c.agent.id, label: c.agent.name ?? `#${c.agent.reference}` } : null);
@@ -411,9 +412,16 @@ export function CaseDetailPage() {
             <div className={`mt-3 rounded-md px-3 py-2 text-center text-sm font-bold ${STATUS_COLORS[statusCode] ?? 'bg-accent-100 text-accent-700'}`}>
               {statusMeta?.name ?? statusCode}
             </div>
-            <div className="mt-2 text-xs text-slate-500">
-              Date Closed: {c?.dateClosed ? new Date(c.dateClosed).toLocaleDateString('en-AU') : '—'}
-            </div>
+            <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+              Date Closed:
+              <input
+                type="date"
+                className="rounded border border-slate-200 px-1 py-0.5 text-xs disabled:border-transparent disabled:bg-transparent"
+                value={form.dateClosed ?? ''}
+                disabled={isNew}
+                onChange={(e) => set('dateClosed', e.target.value)}
+              />
+            </label>
           </div>
         </section>
 

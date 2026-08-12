@@ -272,9 +272,12 @@ export async function computeUpdateFields(
 
   // §6.5 — status change side effect. Re-opening a file (any status back to New Instruction)
   // clears Date Closed the same way moving off New Instruction stamps it — a case shouldn't
-  // show a closed date while its status says it's active again.
+  // show a closed date while its status says it's active again. Wins over a manual edit sent in
+  // the same request, same "trigger overwrites manual value" precedent as Package.
   if (statusChanged) {
     fields.dateClosed = shouldStampDateClosed(effectiveStatusCode) ? new Date() : null;
+  } else if ('dateClosed' in input) {
+    fields.dateClosed = input.dateClosed ? new Date(input.dateClosed) : null;
   }
 
   return fields;

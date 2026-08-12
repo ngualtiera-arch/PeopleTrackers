@@ -165,6 +165,11 @@ export const caseUpdateSchema = caseCreateSchema.partial().extend({
   // different Package from the list, and it sticks until the next Client or Type change
   // recomputes and silently overwrites it (§6.2's "replace existing value" trigger).
   packageCode: z.enum(PACKAGE_CODES).nullable().optional(),
+  // Manual Date Closed override, update-only — auto-stamps/clears on status change by default
+  // (§6.5), but directly editable too, same override pattern as Package: a manual edit sticks
+  // until the next status change auto-recomputes it. Also the only way to fix a case whose
+  // Date Closed predates that auto-behaviour existing.
+  dateClosed: z.string().nullable().optional(),
 });
 
 export const caseListQuerySchema = z.object({
