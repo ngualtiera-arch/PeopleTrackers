@@ -9,8 +9,28 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+// The access token cookie is short-lived (15 min, apps/api/src/routes/auth.routes.ts) so a
+// staff member working through a normal day would otherwise get silently logged out mid-task —
+// even though the 30-day refresh token cookie sitting right there is still perfectly valid. On a
+// 401, try one silent refresh and replay the original request before giving up. Concurrent 401s
+// (several queries expiring around the same moment) share one in-flight refresh instead of each
+// firing their own.
+let refreshInFlight: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
+      .then((res) => res.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
+async function doFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: 'include', // send the httpOnly session cookies
     headers: {
@@ -20,6 +40,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       ...init?.headers,
     },
   });
+}
+
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/logout'];
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  let res = await doFetch(path, init);
+
+  if (res.status === 401 && !AUTH_ENDPOINTS.includes(path)) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      res = await doFetch(path, init);
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));

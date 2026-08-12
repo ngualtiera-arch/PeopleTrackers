@@ -136,8 +136,20 @@ export function CaseDetailPage() {
       setStatusCode(c.status.code);
       setReportSent(c.reportSent);
       setInvoiced(c.invoiced);
+    } else if (isNew) {
+      // Navigating here from an existing case's detail view reuses this same component — without
+      // this, "New" would open showing the previous case's client/agent/form data still in state.
+      setForm({});
+      setClient(null);
+      setAgent(null);
+      setCaseTypeCode('skip_tracing');
+      setPackageCode('');
+      setStatusCode('new_instruction');
+      setReportSent(false);
+      setInvoiced(false);
+      autoCreating.current = false;
     }
-  }, [c]);
+  }, [c, isNew]);
 
   useKeyboardShortcuts([{ key: 'Escape', handler: () => navigate('/files') }]);
 
@@ -257,6 +269,7 @@ export function CaseDetailPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
+        onNew={() => navigate('/files/new')}
         onDelete={isNew ? undefined : handleDelete}
         onPrint={isNew ? undefined : () => setPrintChooserOpen(true)}
         onPrev={prevId ? () => navigate(`/files/${prevId}`, { state }) : undefined}

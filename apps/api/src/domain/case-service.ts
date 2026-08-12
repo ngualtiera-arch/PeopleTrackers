@@ -270,9 +270,11 @@ export async function computeUpdateFields(
     if ('amount' in input) fields.amount = input.amount;
   }
 
-  // §6.5 — status change side effect.
-  if (statusChanged && shouldStampDateClosed(effectiveStatusCode)) {
-    fields.dateClosed = new Date();
+  // §6.5 — status change side effect. Re-opening a file (any status back to New Instruction)
+  // clears Date Closed the same way moving off New Instruction stamps it — a case shouldn't
+  // show a closed date while its status says it's active again.
+  if (statusChanged) {
+    fields.dateClosed = shouldStampDateClosed(effectiveStatusCode) ? new Date() : null;
   }
 
   return fields;
