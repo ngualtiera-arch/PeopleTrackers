@@ -118,6 +118,11 @@ export function CaseDetailPage() {
   const [printChooserOpen, setPrintChooserOpen] = useState(false);
   const [emailReportOpen, setEmailReportOpen] = useState(false);
   const [emailInstructionOpen, setEmailInstructionOpen] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
+  // Set inside the load effect below whenever `c` (re)populates form/client/etc — distinguishes
+  // "the record just loaded" from "the user actually edited something", so autosave doesn't fire
+  // the instant a case opens or after Prev/Next swaps to a different one.
+  const justLoaded = useRef(false);
 
   useEffect(() => {
     if (c) {
@@ -137,6 +142,7 @@ export function CaseDetailPage() {
       setStatusCode(c.status.code);
       setReportSent(c.reportSent);
       setInvoiced(c.invoiced);
+      justLoaded.current = true; // this render's state change is the load itself, not an edit — the autosave effect below must not fire on it
     } else if (isNew) {
       // Navigating here from an existing case's detail view reuses this same component — without
       // this, "New" would open showing the previous case's client/agent/form data still in state.
@@ -201,6 +207,27 @@ export function CaseDetailPage() {
     }
   }
 
+  function buildUpdatePayload(): Record<string, unknown> {
+    const payload = buildPayload();
+    if (client) payload.clientId = client.id;
+    // Update-only (§6.2) — manually picking a Package sticks until the next Client/Type
+    // change recomputes and overwrites it, matching the source exactly.
+    payload.packageCode = packageCode || null;
+    return payload;
+  }
+
+  async function saveExisting() {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setAutosaveStatus('saving');
+    try {
+      await updateMutation.mutateAsync(buildUpdatePayload());
+      setAutosaveStatus('saved');
+    } catch (err) {
+      setAutosaveStatus('error');
+      throw err;
+    }
+  }
+
   async function handleSave() {
     if (isNew) {
       if (!client) {
@@ -216,14 +243,38 @@ export function CaseDetailPage() {
       const created = await createMutation.mutateAsync(payload);
       navigate(`/files/${created.id}`, { replace: true });
     } else {
-      const payload = buildPayload();
-      if (client) payload.clientId = client.id;
-      // Update-only (§6.2) — manually picking a Package sticks until the next Client/Type
-      // change recomputes and overwrites it, matching the source exactly.
-      payload.packageCode = packageCode || null;
-      await updateMutation.mutateAsync(payload);
+      try {
+        await saveExisting();
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : 'Save failed.');
+      }
     }
   }
+
+  // Debounced autosave — a safety net alongside the explicit Save button, not a replacement for
+  // it (Save still commits immediately and shows its own pending state). Skips the instant a
+  // record loads or Prev/Next swaps to a different one via the justLoaded guard set above; only
+  // fires from here on genuine field edits, and only for an existing case (a brand-new one only
+  // starts existing once a client is picked, which already auto-creates it — see selectClient).
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isNew || !c) return; // no data loaded yet — nothing a user could have actually edited
+    if (justLoaded.current) {
+      justLoaded.current = false;
+      return;
+    }
+    setAutosaveStatus('pending');
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      saveExisting().catch(() => {
+        /* status already reflects the error; autosave retries on the next edit */
+      });
+    }, 2000);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, client, agent, caseTypeCode, packageCode, statusCode, reportSent, invoiced, isNew, c]);
 
   async function handleDelete() {
     if (!id || isNew) return;
@@ -340,6 +391,14 @@ export function CaseDetailPage() {
               >
                 Email Report
               </button>
+            )}
+            {!isNew && (
+              <span className="text-xs text-slate-400">
+                {autosaveStatus === 'pending' && 'Unsaved changes'}
+                {autosaveStatus === 'saving' && 'Saving…'}
+                {autosaveStatus === 'saved' && 'Saved'}
+                {autosaveStatus === 'error' && <span className="text-red-500">Autosave failed — click Save</span>}
+              </span>
             )}
             <button className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-50" onClick={() => navigate('/files')}>
               Cancel
