@@ -106,6 +106,7 @@ export function AgentDetailPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
+        onFind={() => navigate(`/files?reset=${Date.now()}`)}
         onDelete={isNew ? undefined : handleDelete}
         onPrint={isNew ? undefined : () => window.open(`${API_BASE}/agents/${id}/report`, '_blank')}
         onPrev={prevId ? () => navigate(`/agents/${prevId}`, { state }) : undefined}

@@ -275,6 +275,7 @@ export function CaseDetailPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
+        onFind={() => navigate(`/files?reset=${Date.now()}`)}
         onNew={() => navigate('/files/new')}
         onDelete={isNew ? undefined : handleDelete}
         onPrint={isNew ? undefined : () => setPrintChooserOpen(true)}
@@ -330,15 +331,27 @@ export function CaseDetailPage() {
       <div className="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-6 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-900">{isNew ? 'New File' : `File ${c?.reference}`}</h1>
-          {!isNew && (
-            <button
-              type="button"
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-              onClick={() => setEmailReportOpen(true)}
-            >
-              Email Report
+          <div className="flex items-center gap-2">
+            {!isNew && (
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                onClick={() => setEmailReportOpen(true)}
+              >
+                Email Report
+              </button>
+            )}
+            <button className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-50" onClick={() => navigate('/files')}>
+              Cancel
             </button>
-          )}
+            <button
+              className="rounded-md bg-accent-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-accent-700 disabled:opacity-50"
+              disabled={saving}
+              onClick={handleSave}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
         </div>
 
         {/*
@@ -551,19 +564,6 @@ export function CaseDetailPage() {
               <textarea className={`${inputClass} min-h-[28rem] font-mono`} value={form.report ?? ''} onChange={(e) => set('report', e.target.value)} />
             </Field>
           </section>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button className="rounded-md border border-slate-300 px-4 py-2 text-sm" onClick={() => navigate('/files')}>
-            Cancel
-          </button>
-          <button
-            className="rounded-md bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-700 disabled:opacity-50"
-            disabled={saving}
-            onClick={handleSave}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
         </div>
       </div>
     </div>

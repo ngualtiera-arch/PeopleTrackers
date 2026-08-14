@@ -108,6 +108,7 @@ export function ClientDetailPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <ActionBar
+        onFind={() => navigate(`/files?reset=${Date.now()}`)}
         onDelete={isNew ? undefined : handleDelete}
         onPrint={isNew ? undefined : () => window.open(`${API_BASE}/clients/${id}/report`, '_blank')}
         onPrev={prevId ? () => navigate(`/clients/${prevId}`, { state }) : undefined}
