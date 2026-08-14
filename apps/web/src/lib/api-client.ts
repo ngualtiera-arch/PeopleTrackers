@@ -46,13 +46,30 @@ async function doFetch(path: string, init?: RequestInit): Promise<Response> {
 
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/logout'];
 
+// A request can fail before any HTTP response comes back at all — fetch throws rather than
+// resolving. Confirmed live: after a couple of large attachment uploads, the tab's connection to
+// the API started throwing on every subsequent request (network-level, not a server error) until
+// the page was reloaded. One retry on a fresh connection recovers from this without the user
+// needing to know a reload would fix it. File/Blob-backed bodies (FormData with a File, or a
+// plain string) are safe to resend — nothing here is a one-shot stream.
+async function doFetchWithRetry(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await doFetch(path, init);
+  } catch (err) {
+    if (err instanceof TypeError) {
+      return doFetch(path, init);
+    }
+    throw err;
+  }
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  let res = await doFetch(path, init);
+  let res = await doFetchWithRetry(path, init);
 
   if (res.status === 401 && !AUTH_ENDPOINTS.includes(path)) {
     const refreshed = await refreshSession();
     if (refreshed) {
-      res = await doFetch(path, init);
+      res = await doFetchWithRetry(path, init);
     }
   }
 
