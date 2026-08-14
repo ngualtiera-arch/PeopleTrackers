@@ -179,22 +179,27 @@ export function CaseDetailPage() {
   // one truly required field (Client) is picked, then quietly become the "editing an existing
   // case" screen — everything unlocks immediately, same as the source, without littering the
   // table with fully-blank rows for someone who picked New and then navigated away.
+  //
+  // Deliberately NOT a useEffect watching [isNew, client] — that was a real, confirmed bug.
+  // Clicking New from an existing case's detail view leaves `client` holding that case's value
+  // for one render (state doesn't clear synchronously just because the URL did); an effect
+  // watching client would fire on that stale leftover value before the reset effect above ever
+  // got a chance to clear it, auto-creating a new case FROM the old one's client. Tying this to
+  // the picker's own onChange instead means it only ever runs from an actual user selection.
   const autoCreating = useRef(false);
-  useEffect(() => {
-    if (!isNew || !client || autoCreating.current) return;
+  async function selectClient(opt: TypeaheadOption | null) {
+    setClient(opt);
+    if (!isNew || !opt || autoCreating.current) return;
     autoCreating.current = true;
-    (async () => {
-      try {
-        const payload = buildPayload();
-        payload.clientId = client.id;
-        const created = await createMutation.mutateAsync(payload);
-        navigate(`/files/${created.id}`, { replace: true, state });
-      } catch {
-        autoCreating.current = false; // let them fix whatever failed and retry by re-picking the client
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, client]);
+    try {
+      const payload = buildPayload();
+      payload.clientId = opt.id;
+      const created = await createMutation.mutateAsync(payload);
+      navigate(`/files/${created.id}`, { replace: true, state });
+    } catch {
+      autoCreating.current = false; // let them fix whatever failed and retry by re-picking the client
+    }
+  }
 
   async function handleSave() {
     if (isNew) {
@@ -348,7 +353,7 @@ export function CaseDetailPage() {
         <section className="grid grid-cols-[1fr_auto] gap-6 rounded-lg border border-slate-200 bg-white p-4">
           <div className="grid grid-cols-4 gap-4">
             <Field label="Client">
-              <TypeaheadPicker value={client} onChange={setClient} search={searchClients} placeholder="Search clients…" />
+              <TypeaheadPicker value={client} onChange={selectClient} search={searchClients} placeholder="Search clients…" />
               {client && !isNew && (
                 <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/clients/${client.id}`)}>
                   Open client →
