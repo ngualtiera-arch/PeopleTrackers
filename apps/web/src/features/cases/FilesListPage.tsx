@@ -160,7 +160,8 @@ export function FilesListPage() {
         <input
           id="case-search"
           type="text"
-          placeholder="Search reference, client, subject, agent, status, type…"
+          placeholder='Search — combine terms, e.g. "frenkel located"'
+          title="Each word narrows the results further — e.g. a client name plus a status finds only that client's files with that status."
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
