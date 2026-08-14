@@ -119,10 +119,7 @@ export function CaseDetailPage() {
   const [emailReportOpen, setEmailReportOpen] = useState(false);
   const [emailInstructionOpen, setEmailInstructionOpen] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
-  // Set inside the load effect below whenever `c` (re)populates form/client/etc — distinguishes
-  // "the record just loaded" from "the user actually edited something", so autosave doesn't fire
-  // the instant a case opens or after Prev/Next swaps to a different one.
-  const justLoaded = useRef(false);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (c) {
@@ -142,7 +139,6 @@ export function CaseDetailPage() {
       setStatusCode(c.status.code);
       setReportSent(c.reportSent);
       setInvoiced(c.invoiced);
-      justLoaded.current = true; // this render's state change is the load itself, not an edit — the autosave effect below must not fire on it
     } else if (isNew) {
       // Navigating here from an existing case's detail view reuses this same component — without
       // this, "New" would open showing the previous case's client/agent/form data still in state.
@@ -162,6 +158,7 @@ export function CaseDetailPage() {
 
   function set(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+    markDirty();
   }
 
   function buildPayload(): Record<string, unknown> {
@@ -195,6 +192,7 @@ export function CaseDetailPage() {
   const autoCreating = useRef(false);
   async function selectClient(opt: TypeaheadOption | null) {
     setClient(opt);
+    markDirty();
     if (!isNew || !opt || autoCreating.current) return;
     autoCreating.current = true;
     try {
@@ -252,17 +250,14 @@ export function CaseDetailPage() {
   }
 
   // Debounced autosave — a safety net alongside the explicit Save button, not a replacement for
-  // it (Save still commits immediately and shows its own pending state). Skips the instant a
-  // record loads or Prev/Next swaps to a different one via the justLoaded guard set above; only
-  // fires from here on genuine field edits, and only for an existing case (a brand-new one only
-  // starts existing once a client is picked, which already auto-creates it — see selectClient).
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (isNew || !c) return; // no data loaded yet — nothing a user could have actually edited
-    if (justLoaded.current) {
-      justLoaded.current = false;
-      return;
-    }
+  // it (Save still commits immediately and takes priority). Deliberately triggered from each
+  // field's own onChange (via markDirty, called from `set` and the other setters below) rather
+  // than a useEffect watching all the form state: an effect fires on ANY state change including
+  // the load effect's own repopulation, which needs a second render to fully settle — that gap
+  // showed "Saving…" the instant a case opened with zero real edits (confirmed live). Nothing
+  // here runs unless an actual onChange fires, which load never does.
+  function markDirty() {
+    if (isNew) return;
     setAutosaveStatus('pending');
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
@@ -270,11 +265,12 @@ export function CaseDetailPage() {
         /* status already reflects the error; autosave retries on the next edit */
       });
     }, 2000);
+  }
+  useEffect(() => {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, client, agent, caseTypeCode, packageCode, statusCode, reportSent, invoiced, isNew, c]);
+  }, []);
 
   async function handleDelete() {
     if (!id || isNew) return;
@@ -434,12 +430,12 @@ export function CaseDetailPage() {
             </Field>
             <Field label="Client Ref."><input className={inputClass} value={form.clientRef ?? ''} onChange={(e) => set('clientRef', e.target.value)} /></Field>
             <Field label="Type">
-              <select className={inputClass} value={caseTypeCode} onChange={(e) => setCaseTypeCode(e.target.value)}>
+              <select className={inputClass} value={caseTypeCode} onChange={(e) => { setCaseTypeCode(e.target.value); markDirty(); }}>
                 {CASE_TYPES.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
               </select>
             </Field>
             <Field label="Agent">
-              <TypeaheadPicker value={agent} onChange={setAgent} search={searchAgents} placeholder="Search agents…" />
+              <TypeaheadPicker value={agent} onChange={(opt) => { setAgent(opt); markDirty(); }} search={searchAgents} placeholder="Search agents…" />
               {agent && !isNew && (
                 <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/agents/${agent.id}`)}>
                   Open agent →
@@ -455,7 +451,7 @@ export function CaseDetailPage() {
                 className={`${inputClass} ${isNew ? 'bg-slate-50' : ''}`}
                 value={packageCode}
                 disabled={isNew}
-                onChange={(e) => setPackageCode(e.target.value)}
+                onChange={(e) => { setPackageCode(e.target.value); markDirty(); }}
               >
                 <option value="">—</option>
                 {PACKAGES.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
@@ -473,17 +469,17 @@ export function CaseDetailPage() {
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
               {CASE_STATUSES.map((s) => (
                 <label key={s.code} className="flex items-center gap-1.5 text-sm text-slate-700">
-                  <input type="radio" name="status" checked={statusCode === s.code} onChange={() => setStatusCode(s.code)} />
+                  <input type="radio" name="status" checked={statusCode === s.code} onChange={() => { setStatusCode(s.code); markDirty(); }} />
                   {s.name}
                 </label>
               ))}
             </div>
             <div className="mt-3 flex gap-4">
               <label className="flex items-center gap-1.5 text-sm text-slate-600">
-                <input type="checkbox" checked={reportSent} onChange={(e) => setReportSent(e.target.checked)} /> Report Sent
+                <input type="checkbox" checked={reportSent} onChange={(e) => { setReportSent(e.target.checked); markDirty(); }} /> Report Sent
               </label>
               <label className="flex items-center gap-1.5 text-sm text-slate-600">
-                <input type="checkbox" checked={invoiced} onChange={(e) => setInvoiced(e.target.checked)} /> Invoiced
+                <input type="checkbox" checked={invoiced} onChange={(e) => { setInvoiced(e.target.checked); markDirty(); }} /> Invoiced
               </label>
             </div>
             <div className={`mt-3 rounded-md px-3 py-2 text-center text-sm font-bold ${STATUS_COLORS[statusCode] ?? 'bg-accent-100 text-accent-700'}`}>
