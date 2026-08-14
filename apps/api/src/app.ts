@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import { env } from './env.js';
 import authPlugin from './plugins/auth.js';
 import errorHandlerPlugin from './plugins/error-handler.js';
@@ -47,6 +48,9 @@ export async function buildApp() {
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
   await app.register(sensible);
   await app.register(cookie);
+  // Case attachment uploads (screenshots/PDFs) — 20MB matches the Supabase Storage bucket's own
+  // file_size_limit, kept in sync manually since the two configs live in different places.
+  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
   await app.register(jwt, { secret: env.JWT_ACCESS_SECRET });
   await app.register(authPlugin);
 

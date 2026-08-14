@@ -282,6 +282,7 @@ model Case {
 
   generatedDocuments GeneratedDocument[]
   emailLogs          EmailLog[]
+  attachments        CaseAttachment[]
 
   @@index([reference])
   @@index([clientId])
@@ -319,6 +320,27 @@ model GeneratedDocument {
   emailLogs EmailLog[]
 
   @@map("generated_documents")
+}
+
+// Screenshots/PDFs attached to a case (§ Nicole request — a "box to add attachments" below the
+// Report field). Unlike GeneratedDocument (an audit trail of what was actually emailed, kept on
+// RESTRICT so a case with email history resists deletion), attachments are just case content —
+// deleting the case should take them with it, hence CASCADE. The API additionally deletes the
+// underlying storage objects itself before the case row goes, since cascade only removes the DB
+// rows, not the files in Supabase Storage.
+model CaseAttachment {
+  id         String   @id @default(uuid())
+  caseId     String   @map("case_id")
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  filename   String
+  mimeType   String   @map("mime_type")
+  sizeBytes  Int      @map("size_bytes")
+  storageKey String   @map("storage_key")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  uploadedBy String?  @map("uploaded_by")
+
+  @@index([caseId])
+  @@map("case_attachments")
 }
 
 model EmailLog {

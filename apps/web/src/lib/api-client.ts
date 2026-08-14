@@ -34,9 +34,11 @@ async function doFetch(path: string, init?: RequestInit): Promise<Response> {
     ...init,
     credentials: 'include', // send the httpOnly session cookies
     headers: {
-      // Only when there's a body — Fastify's JSON body parser rejects an empty body as
-      // invalid JSON, so a bodyless DELETE with this header unconditionally set 400s.
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      // Only when there's a JSON body — Fastify's JSON body parser rejects an empty body as
+      // invalid JSON, so a bodyless DELETE with this header unconditionally set 400s. A FormData
+      // body (file upload) must NOT get this header — the browser sets its own multipart
+      // Content-Type with the boundary, and overriding it here corrupts the upload.
+      ...(init?.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   });

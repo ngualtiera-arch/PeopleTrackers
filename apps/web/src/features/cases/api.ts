@@ -2,6 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api-client';
 import type { CaseListResponse, CaseWithRelations } from './types';
 
+export interface CaseAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  uploadedBy: string | null;
+}
+
 export interface CaseListParams {
   search?: string;
   filter?: 'all' | 'new_instruction' | 'to_report' | 'to_invoice';
@@ -59,6 +68,34 @@ export function useDeleteCase() {
     mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
       apiFetch<void>(`/cases/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cases'] }),
+  });
+}
+
+export function useCaseAttachments(caseId: string | undefined) {
+  return useQuery({
+    queryKey: ['cases', 'attachments', caseId],
+    queryFn: () => apiFetch<CaseAttachment[]>(`/cases/${caseId}/attachments`),
+    enabled: Boolean(caseId),
+  });
+}
+
+export function useUploadAttachment(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return apiFetch<CaseAttachment>(`/cases/${caseId}/attachments`, { method: 'POST', body });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', 'attachments', caseId] }),
+  });
+}
+
+export function useDeleteAttachment(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (attachmentId: string) => apiFetch<void>(`/cases/${caseId}/attachments/${attachmentId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', 'attachments', caseId] }),
   });
 }
 

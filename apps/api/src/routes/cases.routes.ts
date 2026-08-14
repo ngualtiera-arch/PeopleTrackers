@@ -1,8 +1,23 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { Prisma, prisma } from '@peopletrackers/db';
 import { caseCreateSchema, caseUpdateSchema, caseListQuerySchema, copyTemplateSchema } from '@peopletrackers/shared';
 import { buildCaseSearch, caseFilterWhere } from '../lib/case-search.js';
 import { computeCreateFields, computeUpdateFields } from '../domain/case-service.js';
+import { attachmentStorage } from '../storage/attachmentStorage.js';
+
+// Matches the bucket's own allowlist (attachmentStorage.ts / the Supabase bucket config) — kept
+// here too so a bad upload is rejected with a clear message before it ever reaches Storage.
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+]);
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 export const CASE_INCLUDE = {
   client: { include: { package: true } },
@@ -128,6 +143,14 @@ const casesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string }; Querystring: { force?: string } }>('/cases/:id', async (request, reply) => {
     const force = request.query.force === 'true';
 
+    // case_attachments.case_id is ON DELETE CASCADE (schema.prisma) — the DB rows go
+    // automatically with the case. The files in Supabase Storage don't, so their keys are
+    // grabbed before the delete and cleaned up (best-effort) after it succeeds.
+    const attachments = await prisma.caseAttachment.findMany({
+      where: { caseId: request.params.id },
+      select: { storageKey: true },
+    });
+
     try {
       if (force) {
         // Admin-only override — deletes the email/document audit trail along with the case
@@ -155,6 +178,73 @@ const casesRoutes: FastifyPluginAsync = async (fastify) => {
       }
       throw err;
     }
+    await Promise.all(
+      attachments.map((a) => attachmentStorage.remove(a.storageKey).catch((err) => request.log.warn({ err }, 'Failed to remove attachment file after case delete'))),
+    );
+    return reply.status(204).send();
+  });
+
+  // Case attachments (screenshots/PDFs uploaded onto a case, distinct from generated reports).
+  fastify.get<{ Params: { id: string } }>('/cases/:id/attachments', async (request, reply) => {
+    const exists = await prisma.case.findUnique({ where: { id: request.params.id }, select: { id: true } });
+    if (!exists) return reply.notFound('Case not found.');
+    return prisma.caseAttachment.findMany({
+      where: { caseId: request.params.id },
+      orderBy: { uploadedAt: 'desc' },
+      select: { id: true, filename: true, mimeType: true, sizeBytes: true, uploadedAt: true, uploadedBy: true },
+    });
+  });
+
+  fastify.post<{ Params: { id: string } }>('/cases/:id/attachments', async (request, reply) => {
+    const exists = await prisma.case.findUnique({ where: { id: request.params.id }, select: { id: true } });
+    if (!exists) return reply.notFound('Case not found.');
+
+    const file = await request.file({ limits: { fileSize: MAX_ATTACHMENT_BYTES } });
+    if (!file) return reply.badRequest('No file uploaded.');
+    if (!ALLOWED_ATTACHMENT_TYPES.has(file.mimetype)) {
+      return reply.badRequest('Only images (PNG/JPEG/GIF/WEBP/HEIC) and PDFs can be attached.');
+    }
+
+    const content = await file.toBuffer();
+    if (file.file.truncated) {
+      return reply.status(413).send({ statusCode: 413, error: 'Payload Too Large', message: 'Attachments are limited to 20MB.' });
+    }
+
+    const storageKey = `${request.params.id}/${randomUUID()}-${file.filename}`;
+    await attachmentStorage.save(storageKey, content, file.mimetype);
+
+    const attachment = await prisma.caseAttachment.create({
+      data: {
+        caseId: request.params.id,
+        filename: file.filename,
+        mimeType: file.mimetype,
+        sizeBytes: content.length,
+        storageKey,
+        uploadedBy: request.authUser?.id,
+      },
+      select: { id: true, filename: true, mimeType: true, sizeBytes: true, uploadedAt: true, uploadedBy: true },
+    });
+    return reply.status(201).send(attachment);
+  });
+
+  fastify.get<{ Params: { id: string; attachmentId: string } }>('/cases/:id/attachments/:attachmentId', async (request, reply) => {
+    const attachment = await prisma.caseAttachment.findFirst({
+      where: { id: request.params.attachmentId, caseId: request.params.id },
+    });
+    if (!attachment) return reply.notFound('Attachment not found.');
+    const content = await attachmentStorage.read(attachment.storageKey);
+    reply.header('Content-Type', attachment.mimeType);
+    reply.header('Content-Disposition', `inline; filename="${attachment.filename}"`);
+    return reply.send(content);
+  });
+
+  fastify.delete<{ Params: { id: string; attachmentId: string } }>('/cases/:id/attachments/:attachmentId', async (request, reply) => {
+    const attachment = await prisma.caseAttachment.findFirst({
+      where: { id: request.params.attachmentId, caseId: request.params.id },
+    });
+    if (!attachment) return reply.notFound('Attachment not found.');
+    await prisma.caseAttachment.delete({ where: { id: attachment.id } });
+    await attachmentStorage.remove(attachment.storageKey).catch((err) => request.log.warn({ err }, 'Failed to remove attachment file'));
     return reply.status(204).send();
   });
 

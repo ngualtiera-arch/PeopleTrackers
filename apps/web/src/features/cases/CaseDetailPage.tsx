@@ -20,7 +20,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { apiFetch, ApiError, API_BASE } from '../../lib/api-client';
 import { TypeaheadPicker, type TypeaheadOption } from '../../components/TypeaheadPicker';
 import { useAuth } from '../../lib/auth';
-import { useCase, useCreateCase, useUpdateCase, useDeleteCase, useCopyTemplate } from './api';
+import { useCase, useCreateCase, useUpdateCase, useDeleteCase, useCopyTemplate, useCaseAttachments, useUploadAttachment, useDeleteAttachment } from './api';
 
 // §13.4 chooser: from the case detail screen, scope is fixed to "Current Record" — switching
 // to "Records Being Browsed" (the underlying list's filtered set) is better reached from the
@@ -46,6 +46,12 @@ const REPORT_ENDPOINT: Record<string, string> = {
   update_report: 'update_report',
   agent_instruction: 'agent_instruction',
 };
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 type FormState = Record<string, string>;
 
@@ -106,6 +112,9 @@ export function CaseDetailPage() {
   const updateMutation = useUpdateCase(id ?? '');
   const deleteMutation = useDeleteCase();
   const copyTemplateMutation = useCopyTemplate(id ?? '');
+  const { data: attachments } = useCaseAttachments(isNew ? undefined : id);
+  const uploadAttachmentMutation = useUploadAttachment(id ?? '');
+  const deleteAttachmentMutation = useDeleteAttachment(id ?? '');
 
   const [form, setForm] = useState<FormState>({});
   const [client, setClient] = useState<TypeaheadOption | null>(null);
@@ -346,6 +355,25 @@ export function CaseDetailPage() {
       set('report', updated.report ?? '');
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not copy template.');
+    }
+  }
+
+  async function handleUploadAttachment(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    try {
+      await uploadAttachmentMutation.mutateAsync(file);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Upload failed.');
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: string, filename: string) {
+    if (!window.confirm(`Delete "${filename}"? This cannot be undone.`)) return;
+    try {
+      await deleteAttachmentMutation.mutateAsync(attachmentId);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Delete failed.');
     }
   }
 
@@ -660,6 +688,53 @@ export function CaseDetailPage() {
             <Field label="Report">
               <textarea className={`${inputClass} min-h-[28rem] font-mono`} value={form.report ?? ''} onChange={(e) => set('report', e.target.value)} />
             </Field>
+
+            <div className="border-t border-slate-100 pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Attachments</span>
+                <label
+                  className={`cursor-pointer rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 ${isNew ? 'pointer-events-none opacity-40' : ''}`}
+                  title={isNew ? 'Save the case first' : undefined}
+                >
+                  {uploadAttachmentMutation.isPending ? 'Uploading…' : 'Add file'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif,application/pdf"
+                    className="hidden"
+                    disabled={isNew || uploadAttachmentMutation.isPending}
+                    onChange={(e) => {
+                      handleUploadAttachment(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+              {(!attachments || attachments.length === 0) && <p className="text-xs text-slate-400">No files attached yet. Screenshots and PDFs, up to 20MB each.</p>}
+              {attachments && attachments.length > 0 && (
+                <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+                  {attachments.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                      <a
+                        href={`${API_BASE}/cases/${id}/attachments/${a.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1 truncate text-accent-600 hover:underline"
+                      >
+                        {a.filename}
+                      </a>
+                      <span className="shrink-0 text-xs text-slate-400">{formatBytes(a.sizeBytes)}</span>
+                      <button
+                        type="button"
+                        className="shrink-0 text-xs text-red-500 hover:underline"
+                        onClick={() => handleDeleteAttachment(a.id, a.filename)}
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
         </div>
       </div>
