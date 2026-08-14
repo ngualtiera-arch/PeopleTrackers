@@ -120,6 +120,22 @@ export function CaseDetailPage() {
   const [emailInstructionOpen, setEmailInstructionOpen] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirrors form/client/agent/etc for the autosave path, updated synchronously (a ref write, not
+  // a state update) at the exact same point each setter fires. A debounced save reads this
+  // instead of closing over the state variables directly: several `set()` calls can land in the
+  // same React batch with no render committed in between (confirmed live — typing multiple
+  // characters quickly saved a stale, pre-edit value), and only a ref mutation is guaranteed to
+  // be current the instant the setTimeout callback actually runs, regardless of batching.
+  const snapshotRef = useRef({
+    form: {} as FormState,
+    client: null as TypeaheadOption | null,
+    agent: null as TypeaheadOption | null,
+    caseTypeCode: 'skip_tracing',
+    packageCode: '',
+    statusCode: 'new_instruction',
+    reportSent: false,
+    invoiced: false,
+  });
 
   useEffect(() => {
     if (c) {
@@ -139,6 +155,16 @@ export function CaseDetailPage() {
       setStatusCode(c.status.code);
       setReportSent(c.reportSent);
       setInvoiced(c.invoiced);
+      snapshotRef.current = {
+        form: next,
+        client: { id: c.client.id, label: c.client.company ?? c.client.contactName ?? `#${c.client.reference}` },
+        agent: c.agent ? { id: c.agent.id, label: c.agent.name ?? `#${c.agent.reference}` } : null,
+        caseTypeCode: c.caseType.code,
+        packageCode: c.package?.code ?? '',
+        statusCode: c.status.code,
+        reportSent: c.reportSent,
+        invoiced: c.invoiced,
+      };
     } else if (isNew) {
       // Navigating here from an existing case's detail view reuses this same component — without
       // this, "New" would open showing the previous case's client/agent/form data still in state.
@@ -157,7 +183,9 @@ export function CaseDetailPage() {
   useKeyboardShortcuts([{ key: 'Escape', handler: () => navigate('/files') }]);
 
   function set(key: string, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
+    const next = { ...snapshotRef.current.form, [key]: value };
+    snapshotRef.current = { ...snapshotRef.current, form: next };
+    setForm(next);
     markDirty();
   }
 
@@ -192,6 +220,7 @@ export function CaseDetailPage() {
   const autoCreating = useRef(false);
   async function selectClient(opt: TypeaheadOption | null) {
     setClient(opt);
+    snapshotRef.current = { ...snapshotRef.current, client: opt };
     markDirty();
     if (!isNew || !opt || autoCreating.current) return;
     autoCreating.current = true;
@@ -205,12 +234,25 @@ export function CaseDetailPage() {
     }
   }
 
+  // Builds the update payload from snapshotRef rather than the closure'd state variables — see
+  // the comment on snapshotRef's declaration for why (debounced autosave needs the true latest
+  // values at fire-time, not whatever render scheduled the timeout).
   function buildUpdatePayload(): Record<string, unknown> {
-    const payload = buildPayload();
-    if (client) payload.clientId = client.id;
+    const snap = snapshotRef.current;
+    const payload: Record<string, unknown> = {};
+    for (const k of FIELD_KEYS) {
+      const v = snap.form[k];
+      payload[k] = v === '' || v === undefined ? null : NUMERIC_KEYS.includes(k as (typeof NUMERIC_KEYS)[number]) ? Number(v) : v;
+    }
+    payload.caseTypeCode = snap.caseTypeCode;
+    payload.statusCode = snap.statusCode;
+    payload.reportSent = snap.reportSent;
+    payload.invoiced = snap.invoiced;
+    payload.agentId = snap.agent?.id ?? null;
+    if (snap.client) payload.clientId = snap.client.id;
     // Update-only (§6.2) — manually picking a Package sticks until the next Client/Type
     // change recomputes and overwrites it, matching the source exactly.
-    payload.packageCode = packageCode || null;
+    payload.packageCode = snap.packageCode || null;
     return payload;
   }
 
@@ -430,12 +472,12 @@ export function CaseDetailPage() {
             </Field>
             <Field label="Client Ref."><input className={inputClass} value={form.clientRef ?? ''} onChange={(e) => set('clientRef', e.target.value)} /></Field>
             <Field label="Type">
-              <select className={inputClass} value={caseTypeCode} onChange={(e) => { setCaseTypeCode(e.target.value); markDirty(); }}>
+              <select className={inputClass} value={caseTypeCode} onChange={(e) => { setCaseTypeCode(e.target.value); snapshotRef.current = { ...snapshotRef.current, caseTypeCode: e.target.value }; markDirty(); }}>
                 {CASE_TYPES.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
               </select>
             </Field>
             <Field label="Agent">
-              <TypeaheadPicker value={agent} onChange={(opt) => { setAgent(opt); markDirty(); }} search={searchAgents} placeholder="Search agents…" />
+              <TypeaheadPicker value={agent} onChange={(opt) => { setAgent(opt); snapshotRef.current = { ...snapshotRef.current, agent: opt }; markDirty(); }} search={searchAgents} placeholder="Search agents…" />
               {agent && !isNew && (
                 <button type="button" className="mt-1 text-xs text-accent-600 hover:underline" onClick={() => navigate(`/agents/${agent.id}`)}>
                   Open agent →
@@ -451,7 +493,7 @@ export function CaseDetailPage() {
                 className={`${inputClass} ${isNew ? 'bg-slate-50' : ''}`}
                 value={packageCode}
                 disabled={isNew}
-                onChange={(e) => { setPackageCode(e.target.value); markDirty(); }}
+                onChange={(e) => { setPackageCode(e.target.value); snapshotRef.current = { ...snapshotRef.current, packageCode: e.target.value }; markDirty(); }}
               >
                 <option value="">—</option>
                 {PACKAGES.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
@@ -469,17 +511,17 @@ export function CaseDetailPage() {
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
               {CASE_STATUSES.map((s) => (
                 <label key={s.code} className="flex items-center gap-1.5 text-sm text-slate-700">
-                  <input type="radio" name="status" checked={statusCode === s.code} onChange={() => { setStatusCode(s.code); markDirty(); }} />
+                  <input type="radio" name="status" checked={statusCode === s.code} onChange={() => { setStatusCode(s.code); snapshotRef.current = { ...snapshotRef.current, statusCode: s.code }; markDirty(); }} />
                   {s.name}
                 </label>
               ))}
             </div>
             <div className="mt-3 flex gap-4">
               <label className="flex items-center gap-1.5 text-sm text-slate-600">
-                <input type="checkbox" checked={reportSent} onChange={(e) => { setReportSent(e.target.checked); markDirty(); }} /> Report Sent
+                <input type="checkbox" checked={reportSent} onChange={(e) => { setReportSent(e.target.checked); snapshotRef.current = { ...snapshotRef.current, reportSent: e.target.checked }; markDirty(); }} /> Report Sent
               </label>
               <label className="flex items-center gap-1.5 text-sm text-slate-600">
-                <input type="checkbox" checked={invoiced} onChange={(e) => { setInvoiced(e.target.checked); markDirty(); }} /> Invoiced
+                <input type="checkbox" checked={invoiced} onChange={(e) => { setInvoiced(e.target.checked); snapshotRef.current = { ...snapshotRef.current, invoiced: e.target.checked }; markDirty(); }} /> Invoiced
               </label>
             </div>
             <div className={`mt-3 rounded-md px-3 py-2 text-center text-sm font-bold ${STATUS_COLORS[statusCode] ?? 'bg-accent-100 text-accent-700'}`}>
