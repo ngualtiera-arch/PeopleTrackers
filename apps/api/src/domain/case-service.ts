@@ -6,6 +6,7 @@ import {
   resolveAmount,
   resolveDefaultDueDate,
   shouldStampDateClosed,
+  sydneyToday,
   type PackageCode,
   type CaseTypeCode,
   type CaseStatusCode,
@@ -275,7 +276,7 @@ export async function computeUpdateFields(
   // show a closed date while its status says it's active again. Wins over a manual edit sent in
   // the same request, same "trigger overwrites manual value" precedent as Package.
   if (statusChanged) {
-    fields.dateClosed = shouldStampDateClosed(effectiveStatusCode) ? new Date() : null;
+    fields.dateClosed = shouldStampDateClosed(effectiveStatusCode) ? sydneyToday() : null;
   } else if ('dateClosed' in input) {
     fields.dateClosed = input.dateClosed ? new Date(input.dateClosed) : null;
   }

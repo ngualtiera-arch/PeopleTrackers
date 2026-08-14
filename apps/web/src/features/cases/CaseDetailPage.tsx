@@ -417,16 +417,17 @@ export function CaseDetailPage() {
             <div className={`mt-3 rounded-md px-3 py-2 text-center text-sm font-bold ${STATUS_COLORS[statusCode] ?? 'bg-accent-100 text-accent-700'}`}>
               {statusMeta?.name ?? statusCode}
             </div>
-            <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-              Date Closed:
-              <input
-                type="date"
-                className="rounded border border-slate-200 px-1 py-0.5 text-xs disabled:border-transparent disabled:bg-transparent"
-                value={form.dateClosed ?? ''}
-                disabled={isNew}
-                onChange={(e) => set('dateClosed', e.target.value)}
-              />
-            </label>
+            {statusCode !== 'new_instruction' && (
+              <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                Date Closed:
+                <input
+                  type="date"
+                  className="rounded border border-slate-200 px-1 py-0.5 text-xs"
+                  value={form.dateClosed ?? ''}
+                  onChange={(e) => set('dateClosed', e.target.value)}
+                />
+              </label>
+            )}
           </div>
         </section>
 

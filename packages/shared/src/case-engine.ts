@@ -88,6 +88,25 @@ export function shouldStampDateClosed(newStatusCode: CaseStatusCode): boolean {
   return newStatusCode !== 'new_instruction';
 }
 
+/**
+ * "Today" as the business actually experiences it — Sydney's calendar date, not the server's
+ * (server runs UTC; Sydney is UTC+10/+11, so naive `new Date()` is a day behind for roughly the
+ * first 10-11 hours of the Sydney day). Returned as a UTC midnight Date so it round-trips
+ * cleanly through a Postgres DATE column regardless of the server's local timezone.
+ */
+export function sydneyToday(): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Sydney',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const y = Number(parts.find((p) => p.type === 'year')?.value);
+  const m = Number(parts.find((p) => p.type === 'month')?.value);
+  const d = Number(parts.find((p) => p.type === 'day')?.value);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
 /** §6.6 Subject full name — double spaces collapsed. */
 export function subjectFullName(firstname: string | null, middlename: string | null, lastname: string | null): string {
   return [firstname, middlename, lastname]
