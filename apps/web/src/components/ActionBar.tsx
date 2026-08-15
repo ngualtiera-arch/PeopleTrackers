@@ -45,10 +45,10 @@ export function ActionBar({
   useKeyboardShortcuts([{ key: 'f', meta: true, handler: () => navigate(`/files?reset=${Date.now()}`) }]);
 
   const buttonClass =
-    'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white';
+    'rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-white/10';
 
   return (
-    <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
+    <div className="flex items-center justify-between bg-[#1e3a5f] px-4 py-2">
       <div className="flex items-center gap-2">
         <button className={buttonClass} onClick={() => navigate('/')}>
           Main Menu
@@ -63,11 +63,11 @@ export function ActionBar({
           Clients
         </button>
         {(onPrev || onNext) && (
-          <div className="ml-2 flex items-center gap-1 border-l border-slate-200 pl-2">
+          <div className="ml-2 flex items-center gap-1 border-l border-white/20 pl-2">
             <button className={buttonClass} onClick={onPrev} disabled={!onPrev} aria-label="Previous">
               &lt;
             </button>
-            {prevNextLabel && <span className="px-1 text-xs text-slate-500">{prevNextLabel}</span>}
+            {prevNextLabel && <span className="px-1 text-xs text-white/70">{prevNextLabel}</span>}
             <button className={buttonClass} onClick={onNext} disabled={!onNext} aria-label="Next">
               &gt;
             </button>
@@ -82,7 +82,7 @@ export function ActionBar({
             value={searchValue ?? ''}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder ?? 'Search…'}
-            className="w-56 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+            className="w-56 rounded-md border border-white/20 bg-white px-2.5 py-1.5 text-sm focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
         )}
         {onFind && (

@@ -37,7 +37,7 @@ export function AgentsListPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-[#f4f4f2]">
       <ActionBar
         onFind={() => document.getElementById('agent-search')?.focus()}
         onNew={() => navigate('/agents/new')}

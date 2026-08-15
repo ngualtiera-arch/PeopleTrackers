@@ -24,7 +24,7 @@ export function MainMenu() {
   ];
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-[#f4f4f2]">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex items-center gap-3">
           {branding?.logoUrl && <img src={branding.logoUrl} alt="People Trackers" className="h-9 w-auto" />}
@@ -44,7 +44,7 @@ export function MainMenu() {
             <button
               key={b.to}
               onClick={() => navigate(b.to)}
-              className="flex h-28 w-40 flex-col items-center justify-center rounded-lg bg-[#0172ff] text-sm font-semibold text-white shadow-sm transition hover:bg-[#0160d6]"
+              className="flex h-28 w-40 flex-col items-center justify-center rounded-lg bg-accent-600 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-700"
             >
               {b.label}
             </button>

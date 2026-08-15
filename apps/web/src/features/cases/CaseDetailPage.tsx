@@ -390,7 +390,7 @@ export function CaseDetailPage() {
   const statusMeta = CASE_STATUSES.find((s) => s.code === statusCode);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-[#f4f4f2]">
       <ActionBar
         onFind={() => navigate(`/files?reset=${Date.now()}`)}
         onNew={() => navigate('/files/new')}

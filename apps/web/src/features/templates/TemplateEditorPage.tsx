@@ -35,7 +35,7 @@ export function TemplateEditorPage() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-[#f4f4f2]">
       <ActionBar />
       <div className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-6 py-6">
         <div className="flex items-center justify-between">

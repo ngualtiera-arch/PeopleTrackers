@@ -121,7 +121,7 @@ export function FilesListPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-[#f4f4f2]">
       <ActionBar
         onFind={() => document.getElementById('case-search')?.focus()}
         onNew={() => navigate('/files/new')}

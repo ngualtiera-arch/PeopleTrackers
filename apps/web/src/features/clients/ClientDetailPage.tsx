@@ -106,7 +106,7 @@ export function ClientDetailPage() {
   const saving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-[#f4f4f2]">
       <ActionBar
         onFind={() => navigate(`/files?reset=${Date.now()}`)}
         onDelete={isNew ? undefined : handleDelete}
