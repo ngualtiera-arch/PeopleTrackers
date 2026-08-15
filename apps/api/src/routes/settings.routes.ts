@@ -44,6 +44,14 @@ const SETTINGS_SCHEMAS: Record<string, z.ZodTypeAny> = {
 
 /** Settings — Admin only (§9.10, §15). */
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
+  // Not admin-gated, unlike everything else here — the logo is UI chrome every signed-in user
+  // sees (Main Menu), not a business setting, so it can't require the admin role /settings does.
+  fastify.get('/settings/branding', async () => {
+    const row = await prisma.setting.findUnique({ where: { key: 'company' } });
+    const value = row?.value as { logoUrl?: string | null } | undefined;
+    return { logoUrl: value?.logoUrl ?? null };
+  });
+
   fastify.get('/settings', { preHandler: fastify.requireRole('admin') }, async () => {
     const rows = await prisma.setting.findMany();
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));

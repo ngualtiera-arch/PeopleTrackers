@@ -67,6 +67,12 @@ export function useSettings() {
   return useQuery({ queryKey: ['settings'], queryFn: () => apiFetch<AllSettings>('/settings') });
 }
 
+// Unlike useSettings, this works for any signed-in user, not just admins — it's the one piece
+// of Settings (the logo) that's UI chrome everyone sees, not a business setting.
+export function useBranding() {
+  return useQuery({ queryKey: ['settings', 'branding'], queryFn: () => apiFetch<{ logoUrl: string | null }>('/settings/branding') });
+}
+
 export function useUpdateSetting<K extends keyof AllSettings>(key: K) {
   const qc = useQueryClient();
   return useMutation({
