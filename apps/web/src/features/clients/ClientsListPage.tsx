@@ -43,6 +43,12 @@ export function ClientsListPage() {
         onFind={() => document.getElementById('client-search')?.focus()}
         onNew={() => navigate('/clients/new')}
         onPrint={printList}
+        searchValue={search}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search clients…"
       />
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">

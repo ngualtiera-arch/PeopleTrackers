@@ -17,6 +17,9 @@ export function ActionBar({
   onNext,
   prevNextLabel,
   deleteDisabled,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
 }: {
   onFind?: () => void;
   onNew?: () => void;
@@ -27,6 +30,12 @@ export function ActionBar({
   onNext?: () => void;
   prevNextLabel?: string;
   deleteDisabled?: boolean;
+  // A second search box, up here next to Main Menu/Files/Agents/Clients — list pages only, kept
+  // in sync with the same search state as that page's own (larger, filter-adjacent) search box
+  // rather than being a separate search of its own.
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
 }) {
   const navigate = useNavigate();
 
@@ -67,6 +76,15 @@ export function ActionBar({
       </div>
 
       <div className="flex items-center gap-2">
+        {onSearchChange && (
+          <input
+            type="text"
+            value={searchValue ?? ''}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder ?? 'Search…'}
+            className="w-56 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+          />
+        )}
         {onFind && (
           <button className={buttonClass} onClick={onFind}>
             Find

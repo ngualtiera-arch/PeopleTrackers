@@ -42,6 +42,12 @@ export function AgentsListPage() {
         onFind={() => document.getElementById('agent-search')?.focus()}
         onNew={() => navigate('/agents/new')}
         onPrint={printList}
+        searchValue={search}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search agents…"
       />
 
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">

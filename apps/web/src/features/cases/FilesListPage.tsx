@@ -127,6 +127,12 @@ export function FilesListPage() {
         onNew={() => navigate('/files/new')}
         onPrint={() => setPrintChooserOpen(true)}
         onBatchPdf={batchRunning ? undefined : runBatchPdf}
+        searchValue={search}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search files…"
       />
 
       {printChooserOpen && (
