@@ -24,6 +24,23 @@ type CaseWithRelations = Prisma.CaseGetPayload<{
   include: { client: { include: { package: true } }; caseType: true; status: true; package: true };
 }>;
 
+// computeUpdateFields only ever reads these scalars off the "before" row — not the full case
+// (30+ columns) plus full Client/Agent joins that CASE_INCLUDE pulls for the API response shape.
+// A dedicated minimal select for that first read cuts real query/serialization work off every
+// save, distinct from the response-shaping `update` call right after it, which still needs
+// CASE_INCLUDE.
+export const CASE_UPDATE_LOOKUP_SELECT = {
+  clientId: true,
+  rateLocate: true,
+  rateNonLocate: true,
+  units: true,
+  caseType: { select: { code: true } },
+  status: { select: { code: true } },
+  package: { select: { code: true } },
+} satisfies Prisma.CaseSelect;
+
+type CaseUpdateLookup = Prisma.CaseGetPayload<{ select: typeof CASE_UPDATE_LOOKUP_SELECT }>;
+
 /**
  * §6.1 Case defaults on create. Package/rate/fee resolution always runs fresh for a new case —
  * there's no "existing value" to decide whether to overwrite yet.
@@ -124,7 +141,7 @@ export async function computeCreateFields(
  * rate/fee/amount that isn't accompanied by a trigger field change is saved as given.
  */
 export async function computeUpdateFields(
-  existing: CaseWithRelations,
+  existing: CaseUpdateLookup,
   input: CaseUpdateInput,
   userId: string | undefined,
 ): Promise<Prisma.CaseUncheckedUpdateInput> {

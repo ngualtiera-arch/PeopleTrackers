@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma, prisma } from '@peopletrackers/db';
 import { caseCreateSchema, caseUpdateSchema, caseListQuerySchema, copyTemplateSchema } from '@peopletrackers/shared';
 import { buildCaseSearch, caseFilterWhere } from '../lib/case-search.js';
-import { computeCreateFields, computeUpdateFields } from '../domain/case-service.js';
+import { computeCreateFields, computeUpdateFields, CASE_UPDATE_LOOKUP_SELECT } from '../domain/case-service.js';
 import { attachmentStorage } from '../storage/attachmentStorage.js';
 
 // Matches the bucket's own allowlist (attachmentStorage.ts / the Supabase bucket config) — kept
@@ -96,7 +96,10 @@ const casesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.put<{ Params: { id: string } }>('/cases/:id', async (request, reply) => {
     const body = caseUpdateSchema.parse(request.body);
 
-    const existing = await prisma.case.findUnique({ where: { id: request.params.id }, include: CASE_INCLUDE });
+    // Only the fields computeUpdateFields actually reads — not the full row plus Client/Agent
+    // joins CASE_INCLUDE pulls for the response shape. That fuller shape still gets fetched once,
+    // fresh, by the `update` call below.
+    const existing = await prisma.case.findUnique({ where: { id: request.params.id }, select: CASE_UPDATE_LOOKUP_SELECT });
     if (!existing) return reply.notFound('Case not found.');
 
     try {
