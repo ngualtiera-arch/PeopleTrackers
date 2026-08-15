@@ -160,8 +160,8 @@ export function FilesListPage() {
         <input
           id="case-search"
           type="text"
-          placeholder='Search — combine terms, e.g. "frenkel located"'
-          title="Each word narrows the results further — e.g. a client name plus a status finds only that client's files with that status."
+          placeholder='Search — combine terms, e.g. "frenkel located 26/08/2026"'
+          title="Each word narrows the results further — combine a client name, status, and/or a date (DD/MM/YYYY, matches Date Due or Date Entered)."
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
