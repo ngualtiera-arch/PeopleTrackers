@@ -29,7 +29,11 @@ jobs:
 
       - name: Build
         env:
-          VITE_API_URL: https://peopletrackersapi-production.up.railway.app
+          # Moved off Railway (Singapore) to Fly.io (Sydney) — colocated with the Supabase DB
+          # (also Sydney), cutting both the user->API and API->DB legs. Measured live:
+          # Railway ~800-1200ms per request, Fly.io ~50-320ms steady-state on the same
+          # DB-touching operations.
+          VITE_API_URL: https://peopletrackers-api.fly.dev
         run: npm run build -w apps/web
 
       - name: Deploy to Cloudflare Pages
